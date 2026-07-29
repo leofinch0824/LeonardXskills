@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "paper-search": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "paper-search-mcp==0.1.4",
+        "paper-search-mcp"
+      ],
+      "env": {}
+    },
+    "semantic-scholar": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "s2-mcp-server==1.7.1",
+        "s2-mcp-server"
+      ],
+      "env": {}
+    },
+    "arxiv": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "arxiv-mcp-server==0.6.2",
+        "arxiv-mcp-server"
+      ],
+      "env": {}
+    }
+  }
+}

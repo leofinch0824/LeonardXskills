@@ -1,0 +1,5 @@
+interface:
+  display_name: "Paper Trail"
+  short_description: "前沿论文调研 SOP:从业务痛点到可落地方案"
+policy:
+  allow_implicit_invocation: false
