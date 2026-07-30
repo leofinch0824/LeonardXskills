@@ -4,7 +4,7 @@
 
 ## 对抗复核(Synthesis 后,只对 T0/T1 抽取卡)
 
-每篇 T0/T1 派一个 subagent:拿抽取卡回比对源文本(`.cache/` 里的解析 markdown 或 LaTeX 章节),逐字段打标:
+每篇 T0/T1 派一个 subagent:拿抽取卡回比对源文本(`<run-dir>/.cache/` 里的解析 markdown 或 LaTeX 章节),逐字段打标:
 
 - **grounded**:源文本直接支持
 - **partial**:源文本部分支持,抽取有放大 → 在抽取卡该字段后标注"[部分外推]"

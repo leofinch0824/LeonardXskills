@@ -140,7 +140,7 @@ skill 只承诺稳定接口 `query_paper(paper_id, question) → 带引用片段
 - PwC 一等源；has-code 加权
 - 前置：`uv` + paper-search-mcp / s2-mcp / arxiv-mcp-server 三者安装 + S2 key（强烈建议，无 key 429 严重）+ 限速退避
 - 反幻觉不变量：identifier 只能 API 生成
-- 中文简报；首轮在项目 `.claude/skills/` 中隔离测试，验证通过后再决定是否晋升为 personal skill；知识库写工作区 `research/`
+- 中文简报；Skill 源码以可复制的 `paper-trail/` 包维护，可安装到任意受支持的 skill discovery 目录；运行数据与安装目录解耦
 
 **接口契约（后端可插拔）：** `query_paper(paper_id, question) → 带引用片段`
 
@@ -203,10 +203,10 @@ skill 只承诺稳定接口 `query_paper(paper_id, question) → 带引用片段
 
 ### 位置与文件树
 
-首轮以项目级 skill 测试：`.claude/skills/paper-trail/`（user-invoked，`disable-model-invocation: true`，零 context load；事件驱动由用户手动触发，符合 Q2）。用户数据与 skill 定义分离：profile 在 `.claude/paper-trail/profile.md`，知识库在工作区 `research/`。验收通过后再决定是否晋升到 personal scope，测试阶段不保留同名 personal 副本，避免发现顺序干扰。
+源码包维护在 `paper-trail/`（user-invoked，`disable-model-invocation: true`，零 context load；事件驱动由用户手动触发，符合 Q2）。复制到目标项目时，把整个目录放入该宿主支持的 skill discovery 目录；运行时以当前 `SKILL.md` 所在目录解析 `<skill-root>`，不依赖 project/personal 安装层级。用户数据与 Skill 定义分离：默认 profile 写 `<workspace-root>/.paper-trail/profile.md`，知识库写 `<workspace-root>/research/`，两者均可通过环境变量覆盖。
 
 ```
-.claude/skills/paper-trail/
+paper-trail/
 ├── SKILL.md                 — 骨架:3 条不变量 + preflight 3 步 + 7 阶段(每阶段带闸门)+ 交付审计
 ├── agents/openai.yaml       — 仓库惯例样板
 ├── reference/               — 按需查阅(渐进披露,不占骨架篇幅)
@@ -216,25 +216,27 @@ skill 只承诺稳定接口 `query_paper(paper_id, question) → 带引用片段
 │   ├── extract.md           — Layer B 路由(LaTeX>MinerU>GROBID)+ worker 用法与降级梯 + 可适用性四档
 │   ├── verify.md            — 全部验证协议单一出处:对抗复核/完整性批判/记分卡阈值/失败政策
 │   └── synthesize.md        — trade-off 矩阵 + 时间线 + 痛点映射 + mermaid 约定 + 语言约定
-├── templates/               — 每轮实例化到 research/<date>-<slug>/ 的模板
+├── templates/               — 每轮实例化到 <research-root>/<date>-<slug>/ 的模板
 │   ├── intake.md / landscape.md / pool.md / triage.md / extraction.md
 │   └── synthesis.md / brief.md / ledger.md / profile.md
 └── scripts/
-    ├── preflight.py         — 项目产物/MCP pin/可选 env 一键检查,可选 --live-mcp
+    ├── preflight.py         — 任意工作区 bootstrap + Skill/MCP/env 检查
     └── extract_paper.py     — 离线抽取 worker:OpenAI 兼容端点,env 三变量配置,--selftest 自测,usage 打 stdout 供台账
 ```
 
 ### 关键契约
 
-- **每轮运行目录**：`research/<YYYY-MM-DD>-<slug>/` → `00-intake.md` … `06-brief.md` + `04-extractions/` + `ledger.md` + `.cache/`（解析 markdown/原始 API 响应，可重建）
-- **回灌契约**：读侧 = preflight 必读 profile.md + research/INDEX.md（恒定小成本）；写侧 = Brief 阶段追加 INDEX.md 一行 + profile 增量追加（不覆写）
+- **路径锚点**：`<skill-root>` 从脚本/`SKILL.md` 自身位置解析；`<workspace-root>` 按显式参数/环境变量 → Git 根 → 当前目录解析；`<state-root>` 默认 `<workspace-root>/.paper-trail`；`<research-root>` 默认 `<workspace-root>/research`
+- **每轮运行目录**：`<research-root>/<YYYY-MM-DD>-<slug>/` → `00-intake.md` … `06-brief.md` + `04-extractions/` + `ledger.md` + `.cache/`（解析 markdown/原始 API 响应，可重建）
+- **回灌契约**：读侧 = preflight 必读 `<state-root>/profile.md` + `<research-root>/INDEX.md`（恒定小成本）；写侧 = Brief 阶段追加 INDEX.md 一行 + profile 增量追加（不覆写）
+- **所有权契约**：`<state-root>` 是默认忽略的项目私有状态；`<research-root>` 是可纳入版本控制的团队知识库；`--bootstrap` 只创建缺失文件，不覆盖已有内容
 - **记分卡及格线**（verify.md）：覆盖度 100% / 引用密度 ≥90% / unsupported=0 / 可操作性布尔 / 完整性 100% / 校准度人工回填
 - **失败政策**：回炉 ≤1 次 → 带警告交付并标注未过闸章节；不静默降级、不无限回炉
 - **抽取 worker**：`PAPER_TRAIL_WORKER_BASE_URL/_KEY/_MODEL` 三变量；不配则走降级梯（subagent 抽取 → 主 agent 仅 T0）
 
 ### 环境配置步骤
 
-1. 测试阶段用 project scope 注册三个 MCP（配置落在项目 `.mcp.json`，并固定已验活版本）：`paper-search-mcp==0.1.4`、`s2-mcp-server==1.7.1`、`arxiv-mcp-server==0.6.2`。uv/uvx 已装，三项均已在项目内实测 Connected（2026-07-30）。
+1. MCP 可注册在目标项目或 user scope；推荐已验活版本为 `paper-search-mcp==0.1.4`、`s2-mcp-server==1.7.1`、`arxiv-mcp-server==0.6.2`。没有 MCP 时按免 key API 降级梯运行。
 2. 用户行动：申请 S2 免费 API key，配 `SEMANTIC_SCHOLAR_API_KEY`（无 key 时 S2 系 429 严重，可用但慢）。
 3. 用户行动：配 worker 三环境变量（OpenAI 兼容端点 + 最便宜档模型），不配则 worker 走降级。localhost/private IP/`.local`/`.internal` 默认视为内网；其他端点仅允许 HTTPS，且只有 paper 与 profile 均已脱敏时才显式传 `--desensitized`。
 4. 注意：已装的 github plugin MCP 报 Authorization 错误（400），需配 token 才能用，与本 skill 无关，另行处理。
@@ -244,18 +246,17 @@ skill 只承诺稳定接口 `query_paper(paper_id, question) → 带引用片段
 | 步 | 内容 | 状态 |
 |---|---|---|
 | 1 | 坐实三后端 CLI 入口（PyPI+README 实证） | ✅ |
-| 2 | 写项目级 skill（SKILL.md+6 reference+9 templates+script+yaml） | ✅ |
-| 3 | 落地 `.claude/paper-trail/profile.md` + 工作区 `research/INDEX.md` | ✅ |
+| 2 | 写可复制 Skill 包（SKILL.md+6 reference+9 templates+2 scripts+yaml） | ✅ |
+| 3 | preflight 在目标工作区首次运行时 bootstrap profile + `research/INDEX.md` | ✅ |
 | 4 | 用 project scope 注册并验活三个 MCP | ✅ |
-| 5 | 更新本文档实施状态 + 项目级发现/worker 回归测试 | ✅ |
+| 5 | 路径解耦 + 任意目录迁移/worker 回归测试 | ✅ |
 | 6 | 验收：用痛点一（PCB 多图数值归因）跑一轮完整 7 阶段 | 待用户触发（消耗 token） |
 
 ### 本轮工程验证（2026-07-30）
 
-- Claude CLI 从项目 `.claude/skills/paper-trail/` 成功发现 `/paper-trail`，并正确返回项目 profile 路径与 Intake 人工闸门。
 - `claude mcp list`：`paper-search`、`semantic-scholar`、`arxiv` 均为 `Connected`；GitHub plugin 的 HTTP 400 仍是独立已知问题。
-- `python3 .claude/skills/paper-trail/scripts/preflight.py --live-mcp`：项目产物与 pinned MCP 检查通过；因真实 S2/worker 凭据未配置，按设计返回 `degraded`。
-- `python3 -m unittest -v tests/test_paper_trail.py`：8/8 通过，覆盖项目产物契约、personal 路径隔离、preflight 降级报告、worker `--selftest`、完整抽取写卡、外部端点脱敏/HTTPS 闸、超长正文拒绝静默截断与 token usage 输出。
+- 将 `paper-trail/` 复制到任意临时目录后，`preflight.py --workspace-root <空工作区> --bootstrap` 能创建 `.paper-trail/profile.md` 与 `research/INDEX.md`；从 Skill 子目录启动且不传工作区时，也能回退到 Git 根，不依赖原安装路径。
+- `python3 -m unittest -v tests/test_paper_trail.py`：10/10 通过，覆盖 Skill 包完整性/破损副本阻断、安装路径隔离、Git 根回退、任意目录 bootstrap/不覆盖/路径覆写、worker `--selftest`、完整抽取写卡、外部端点脱敏/HTTPS 闸、超长正文拒绝静默截断与 token usage 输出。
 - 真实 worker 凭据与 S2 key 当前未配置；worker 已通过本地假 OpenAI 兼容端点验证，真实运行按既定降级梯处理。
 
 ### 验收标准
@@ -268,6 +269,6 @@ skill 只承诺稳定接口 `query_paper(paper_id, question) → 带引用片段
 - [ ] 给环境配 `GITHUB_TOKEN`（或装 gh CLI），解锁 API 元数据批量查询（rate limit 60→5000）。
 - [x] ~~按名手动核对学术 MCP server 现状与许可证~~ → 已完成（见第五节复核表）：全部 license 干净且活跃维护；产出三条设计修订写入第七节。
 - [x] ~~细化需求（grilling 11 问）~~ → 已全部确认，见第十节。
-- [x] ~~进 plan 定 skill 文件结构、各阶段模板（含验证闸出口标准）、记分卡与回灌契约格式~~ → 已落地项目级 skill，并补齐 `landscape.md` / `synthesis.md` 与统一的 `triage.md` 模板。
+- [x] ~~进 plan 定 skill 文件结构、各阶段模板（含验证闸出口标准）、记分卡与回灌契约格式~~ → 已落地可迁移 Skill 包，并补齐 `landscape.md` / `synthesis.md` 与统一的 `triage.md` 模板。
 - [ ] 配置 `SEMANTIC_SCHOLAR_API_KEY` 与 `PAPER_TRAIL_WORKER_*` 三变量后，运行真实后端 preflight。
 - [ ] 用第十节痛点一跑首轮完整 7 阶段验收。

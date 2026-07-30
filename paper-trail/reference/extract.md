@@ -5,18 +5,18 @@
 ## Layer B 路由(拿正文,按优先级)
 
 1. **arXiv 有 LaTeX 源** → arxiv-mcp 按章节读(最干净,公式保真,零解析错误)
-2. **仅 PDF** → MinerU 子进程解析成 markdown(`uvx magic-pdf`,AGPL 只作子进程),落 `.cache/`
+2. **仅 PDF** → MinerU 子进程解析成 markdown(`uvx magic-pdf`,AGPL 只作子进程),落 `<run-dir>/.cache/`
 3. **MinerU 不可用或 license 敏感** → GROBID(Apache-2.0)
 4. 以上皆缺 → abstract+TLDR only,抽取卡标注 `abstract-only`(置信度降档)
 
 ## 离线抽取 worker
 
 ```bash
-python3 .claude/skills/paper-trail/scripts/extract_paper.py \
-  --paper <解析后 markdown 或 LaTeX 拼接> \
-  --template .claude/skills/paper-trail/templates/extraction.md \
-  --profile .claude/paper-trail/profile.md \
-  --out 04-extractions/<paper-id>.md
+python3 "<skill-root>/scripts/extract_paper.py" \
+  --paper "<run-dir>/.cache/<paper-id>.md" \
+  --template "<skill-root>/templates/extraction.md" \
+  --profile "<profile-path>" \
+  --out "<run-dir>/04-extractions/<paper-id>.md"
 ```
 
 worker 用便宜模型一次调用按模板产出抽取卡,不经 agent 上下文,token 用量打印到 stdout(抄进 ledger.md)。若端点不属于 localhost/private IP/`.local`/`.internal`/`PAPER_TRAIL_WORKER_TRUSTED_HOSTS`,必须使用 HTTPS 并在确认 paper 与 profile 均已脱敏后显式加 `--desensitized`。

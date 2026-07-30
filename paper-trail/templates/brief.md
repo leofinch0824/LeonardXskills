@@ -1,7 +1,7 @@
 # 调研简报 — <痛点一句话>
 
 - 日期 / slug:<YYYY-MM-DD>-<slug>
-- 知识库:`research/<date>-<slug>/`
+- 知识库:`<research-root>/<date>-<slug>/`
 
 ## 记分卡
 

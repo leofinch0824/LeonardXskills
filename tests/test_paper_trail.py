@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -9,12 +10,12 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SKILL_ROOT = PROJECT_ROOT / ".claude" / "skills" / "paper-trail"
+SKILL_ROOT = PROJECT_ROOT / "paper-trail"
 WORKER = SKILL_ROOT / "scripts" / "extract_paper.py"
 
 
-class PaperTrailProjectContractTest(unittest.TestCase):
-    def test_project_skill_has_every_runtime_artifact(self):
+class PaperTrailPackageContractTest(unittest.TestCase):
+    def test_skill_package_contains_every_bundled_artifact(self):
         expected_files = [
             "SKILL.md",
             "agents/openai.yaml",
@@ -44,25 +45,23 @@ class PaperTrailProjectContractTest(unittest.TestCase):
         ]
 
         self.assertEqual([], missing)
-        self.assertTrue((PROJECT_ROOT / ".claude/paper-trail/profile.md").is_file())
-        self.assertTrue((PROJECT_ROOT / "research/INDEX.md").is_file())
 
-    def test_skill_contract_uses_only_project_local_paths(self):
+    def test_skill_contract_has_no_installation_specific_paths(self):
         skill_text = "\n".join(
             path.read_text(encoding="utf-8")
             for path in SKILL_ROOT.rglob("*")
             if path.is_file() and path.suffix in {".md", ".yaml", ".py"}
         )
 
+        self.assertNotIn("/home/", skill_text)
+        self.assertNotIn(".claude/skills/paper-trail", skill_text)
+        self.assertNotIn(".claude/paper-trail", skill_text)
         self.assertNotIn("~/.claude/skills/paper-trail", skill_text)
         self.assertNotIn("~/.claude/paper-trail/profile.md", skill_text)
         self.assertNotIn("triage-log.md", skill_text)
-        self.assertNotIn("python3 scripts/extract_paper.py", skill_text)
-        self.assertIn(".claude/paper-trail/profile.md", skill_text)
-        self.assertIn(
-            "python3 .claude/skills/paper-trail/scripts/extract_paper.py",
-            skill_text,
-        )
+        self.assertIn("<skill-root>", skill_text)
+        self.assertIn("<workspace-root>", skill_text)
+        self.assertIn("<research-root>", skill_text)
 
 
 class WorkerHandler(BaseHTTPRequestHandler):
@@ -284,9 +283,78 @@ class ExtractPaperCliTest(unittest.TestCase):
             self.assertFalse(output.exists())
 
 
-class ProjectPreflightCliTest(unittest.TestCase):
-    def test_preflight_reports_pinned_mcp_and_optional_env_degradation(self):
-        preflight = SKILL_ROOT / "scripts" / "preflight.py"
+class PortablePreflightCliTest(unittest.TestCase):
+    def test_preflight_blocks_an_incomplete_skill_copy(self):
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            relocated_skill = root / "paper-trail"
+            workspace = root / "target-workspace"
+            shutil.copytree(SKILL_ROOT, relocated_skill)
+            workspace.mkdir()
+            (relocated_skill / "reference/verify.md").unlink()
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(relocated_skill / "scripts/preflight.py"),
+                    "--workspace-root",
+                    str(workspace),
+                    "--bootstrap",
+                    "--json",
+                ],
+                cwd=workspace,
+                text=True,
+                capture_output=True,
+            )
+            report = json.loads(result.stdout)
+
+            self.assertEqual(1, result.returncode)
+            self.assertEqual("blocked", report["status"])
+            self.assertFalse(report["checks"]["skill_package"])
+            self.assertIn("reference/verify.md", "\n".join(report["errors"]))
+
+    def test_preflight_falls_back_to_git_root_from_skill_directory(self):
+        env = os.environ.copy()
+        env.pop("PAPER_TRAIL_WORKSPACE_ROOT", None)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            workspace = Path(temporary_directory) / "target-workspace"
+            relocated_skill = workspace / "tools" / "paper-trail"
+            workspace.mkdir()
+            shutil.copytree(SKILL_ROOT, relocated_skill)
+            subprocess.run(
+                ["git", "init", "--quiet"],
+                cwd=workspace,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    "scripts/preflight.py",
+                    "--bootstrap",
+                    "--json",
+                ],
+                cwd=relocated_skill,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            report = json.loads(result.stdout)
+
+            self.assertEqual(
+                str(workspace.resolve()),
+                report["paths"]["workspace_root"],
+            )
+            self.assertTrue((workspace / ".paper-trail/profile.md").is_file())
+            self.assertTrue((workspace / "research/INDEX.md").is_file())
+            self.assertFalse((relocated_skill / ".paper-trail").exists())
+            self.assertFalse((relocated_skill / "research").exists())
+
+    def test_relocated_skill_bootstraps_an_empty_workspace(self):
         env = os.environ.copy()
         for name in (
             "SEMANTIC_SCHOLAR_API_KEY",
@@ -296,22 +364,122 @@ class ProjectPreflightCliTest(unittest.TestCase):
         ):
             env.pop(name, None)
 
-        result = subprocess.run(
-            ["python3", str(preflight), "--json"],
-            cwd=PROJECT_ROOT,
-            env=env,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
-        report = json.loads(result.stdout)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            relocated_skill = root / "custom-skill-location" / "paper-trail"
+            workspace = root / "empty-target-workspace"
+            shutil.copytree(SKILL_ROOT, relocated_skill)
+            workspace.mkdir()
+            preflight = relocated_skill / "scripts" / "preflight.py"
 
-        self.assertEqual("degraded", report["status"])
-        self.assertEqual([], report["errors"])
-        self.assertTrue(report["checks"]["project_artifacts"])
-        self.assertTrue(report["checks"]["mcp_pins"])
-        self.assertFalse(report["capabilities"]["s2_api_key"])
-        self.assertFalse(report["capabilities"]["worker"])
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(preflight),
+                    "--workspace-root",
+                    str(workspace),
+                    "--bootstrap",
+                    "--json",
+                ],
+                cwd=workspace,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            report = json.loads(result.stdout)
+
+            self.assertEqual("degraded", report["status"])
+            self.assertEqual([], report["errors"])
+            self.assertTrue(report["checks"]["skill_package"])
+            self.assertTrue(report["checks"]["runtime_artifacts"])
+            self.assertFalse(report["checks"]["mcp_config"])
+            self.assertFalse(report["capabilities"]["s2_api_key"])
+            self.assertFalse(report["capabilities"]["worker"])
+            self.assertEqual(
+                str(relocated_skill.resolve()),
+                report["paths"]["skill_root"],
+            )
+            self.assertEqual(
+                str(workspace.resolve()),
+                report["paths"]["workspace_root"],
+            )
+            self.assertTrue((workspace / ".paper-trail/profile.md").is_file())
+            self.assertTrue((workspace / "research/INDEX.md").is_file())
+            self.assertEqual(
+                (relocated_skill / "templates/profile.md").read_text(
+                    encoding="utf-8"
+                ),
+                (workspace / ".paper-trail/profile.md").read_text(
+                    encoding="utf-8"
+                ),
+            )
+
+            custom_profile = "# Existing project profile\n"
+            (workspace / ".paper-trail/profile.md").write_text(
+                custom_profile,
+                encoding="utf-8",
+            )
+            second_result = subprocess.run(
+                [
+                    "python3",
+                    str(preflight),
+                    "--workspace-root",
+                    str(workspace),
+                    "--bootstrap",
+                    "--json",
+                ],
+                cwd=workspace,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            second_report = json.loads(second_result.stdout)
+
+            self.assertEqual([], second_report["created"])
+            self.assertEqual(
+                custom_profile,
+                (workspace / ".paper-trail/profile.md").read_text(
+                    encoding="utf-8"
+                ),
+            )
+
+            alternate_workspace = root / "alternate-workspace"
+            alternate_workspace.mkdir()
+            alternate_state = root / "portable-state"
+            alternate_research = root / "portable-research"
+            alternate_env = env | {
+                "PAPER_TRAIL_STATE_DIR": str(alternate_state),
+                "PAPER_TRAIL_RESEARCH_DIR": str(alternate_research),
+            }
+            alternate_result = subprocess.run(
+                [
+                    "python3",
+                    str(preflight),
+                    "--workspace-root",
+                    str(alternate_workspace),
+                    "--bootstrap",
+                    "--json",
+                ],
+                cwd=alternate_workspace,
+                env=alternate_env,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            alternate_report = json.loads(alternate_result.stdout)
+
+            self.assertEqual(
+                str(alternate_state),
+                alternate_report["paths"]["state_root"],
+            )
+            self.assertEqual(
+                str(alternate_research),
+                alternate_report["paths"]["research_root"],
+            )
+            self.assertTrue((alternate_state / "profile.md").is_file())
+            self.assertTrue((alternate_research / "INDEX.md").is_file())
 
 
 if __name__ == "__main__":
