@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import shutil
@@ -12,6 +13,18 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = PROJECT_ROOT / "paper-trail"
 WORKER = SKILL_ROOT / "scripts" / "extract_paper.py"
+PREFLIGHT = SKILL_ROOT / "scripts" / "preflight.py"
+WORKER_BOUNDARY = SKILL_ROOT / "scripts" / "worker_boundary.py"
+
+
+def load_worker_boundary():
+    spec = importlib.util.spec_from_file_location(
+        "paper_trail_worker_boundary",
+        WORKER_BOUNDARY,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class PaperTrailPackageContractTest(unittest.TestCase):
@@ -27,6 +40,7 @@ class PaperTrailPackageContractTest(unittest.TestCase):
             "reference/verify.md",
             "scripts/extract_paper.py",
             "scripts/preflight.py",
+            "scripts/worker_boundary.py",
             "templates/brief.md",
             "templates/extraction.md",
             "templates/intake.md",
@@ -62,6 +76,144 @@ class PaperTrailPackageContractTest(unittest.TestCase):
         self.assertIn("<skill-root>", skill_text)
         self.assertIn("<workspace-root>", skill_text)
         self.assertIn("<research-root>", skill_text)
+
+    def test_default_profile_is_portable_and_tracks_confirmed_updates(self):
+        profile = (SKILL_ROOT / "templates/profile.md").read_text(encoding="utf-8")
+
+        for personalized_default in ("4×H20", "30B", "70B", "PCB"):
+            self.assertNotIn(personalized_default, profile)
+        for field in (
+            "微调能力：TBD",
+            "算力预算：TBD",
+            "权重要求：TBD",
+            "数据出域规则：TBD",
+            "延迟要求：TBD",
+            "License 限制：TBD",
+            "## 增量更新记录",
+            "| 日期 | 调研运行 | 变更字段 | 旧值 | 新值 | 依据 |",
+        ):
+            self.assertIn(field, profile)
+
+    def test_extract_applicability_is_relative_to_profile(self):
+        extract = (SKILL_ROOT / "reference/extract.md").read_text(encoding="utf-8")
+
+        for fixed_resource in ("4×H20", "30B", "70B"):
+            self.assertNotIn(fixed_resource, extract)
+        for contract in (
+            "待确认",
+            "Profile",
+            "Stage 5",
+            "数据出域",
+        ):
+            self.assertIn(contract, extract)
+
+    def test_markdown_workflow_contracts_are_present(self):
+        intake = (SKILL_ROOT / "templates/intake.md").read_text(encoding="utf-8")
+        landscape = (SKILL_ROOT / "templates/landscape.md").read_text(encoding="utf-8")
+        pool = (SKILL_ROOT / "templates/pool.md").read_text(encoding="utf-8")
+        triage = (SKILL_ROOT / "templates/triage.md").read_text(encoding="utf-8")
+        ledger = (SKILL_ROOT / "templates/ledger.md").read_text(encoding="utf-8")
+        brief = (SKILL_ROOT / "templates/brief.md").read_text(encoding="utf-8")
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("已确认并冻结", intake)
+        self.assertIn("重新打开", intake)
+        self.assertIn("## Intake 词表校准", landscape)
+        self.assertIn("同义扩展", landscape)
+        self.assertIn("语义修正", landscape)
+        self.assertIn("词来源", pool)
+        for source in ("Intake", "Landscape", "Snowballing", "补检"):
+            self.assertIn(source, pool)
+        self.assertIn("POOL_THIN", triage)
+        self.assertIn("accepted-thin", triage)
+        self.assertIn("补检状态", triage)
+        self.assertIn("每篇抽取卡 token", ledger)
+        self.assertIn("每篇入选论文总 token", ledger)
+        self.assertIn("## 运行指标（非质量闸门）", brief)
+        for state in ("POOL_THIN", "resolved", "accepted-thin"):
+            self.assertIn(state, skill)
+
+
+class WorkerBoundaryClassificationTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.classify = staticmethod(
+            load_worker_boundary().classify_worker_endpoint
+        )
+
+    def assert_classification(
+        self,
+        base_url,
+        expected,
+        trusted_hosts=(),
+        *,
+        trusted=False,
+        requires_desensitized=False,
+        transport_allowed=False,
+    ):
+        result = self.classify(base_url, trusted_hosts)
+
+        self.assertEqual(expected, result["classification"])
+        self.assertEqual(trusted, result["trusted"])
+        self.assertEqual(
+            requires_desensitized,
+            result["requires_desensitized"],
+        )
+        self.assertEqual(transport_allowed, result["transport_allowed"])
+
+    def test_unconfigured_endpoint(self):
+        self.assert_classification(None, "unconfigured")
+
+    def test_invalid_endpoint(self):
+        self.assert_classification("not-a-url", "invalid")
+
+    def test_localhost_http_is_trusted(self):
+        self.assert_classification(
+            "http://localhost:8080/v1",
+            "trusted-local",
+            trusted=True,
+            transport_allowed=True,
+        )
+
+    def test_private_ip_is_trusted(self):
+        self.assert_classification(
+            "http://192.168.10.2/v1",
+            "trusted-local",
+            trusted=True,
+            transport_allowed=True,
+        )
+
+    def test_internal_hostname_is_trusted(self):
+        self.assert_classification(
+            "http://worker.service.internal/v1",
+            "trusted-local",
+            trusted=True,
+            transport_allowed=True,
+        )
+
+    def test_configured_hostname_is_trusted(self):
+        self.assert_classification(
+            "http://worker.corp.example/v1",
+            "trusted-local",
+            trusted_hosts=("worker.corp.example",),
+            trusted=True,
+            transport_allowed=True,
+        )
+
+    def test_external_https_requires_desensitization(self):
+        self.assert_classification(
+            "https://api.example.com/v1",
+            "external-https",
+            requires_desensitized=True,
+            transport_allowed=True,
+        )
+
+    def test_external_http_is_blocked(self):
+        self.assert_classification(
+            "http://api.example.com/v1",
+            "external-http-blocked",
+            requires_desensitized=True,
+        )
 
 
 class WorkerHandler(BaseHTTPRequestHandler):
@@ -137,6 +289,22 @@ class ExtractPaperCliTest(unittest.TestCase):
         self.assertEqual("/v1/chat/completions", request["path"])
         self.assertEqual("Bearer test-key", request["authorization"])
         self.assertEqual("test-model", request["body"]["model"])
+
+    def test_selftest_rejects_external_http_before_sending_credentials(self):
+        external_env = self.worker_env | {
+            "PAPER_TRAIL_WORKER_BASE_URL": "http://example.invalid/v1",
+        }
+
+        result = subprocess.run(
+            ["python3", str(WORKER), "--selftest"],
+            env=external_env,
+            text=True,
+            capture_output=True,
+            timeout=5,
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("外部 worker 端点只允许 HTTPS", result.stderr)
 
     def test_extract_writes_card_and_reports_usage(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -284,6 +452,90 @@ class ExtractPaperCliTest(unittest.TestCase):
 
 
 class PortablePreflightCliTest(unittest.TestCase):
+    def run_preflight(self, worker_env):
+        temporary_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary_directory.cleanup)
+        workspace = Path(temporary_directory.name) / "workspace"
+        workspace.mkdir()
+        env = os.environ.copy()
+        for name in (
+            "PAPER_TRAIL_WORKER_BASE_URL",
+            "PAPER_TRAIL_WORKER_KEY",
+            "PAPER_TRAIL_WORKER_MODEL",
+            "PAPER_TRAIL_WORKER_TRUSTED_HOSTS",
+        ):
+            env.pop(name, None)
+        env.update(worker_env)
+        result = subprocess.run(
+            [
+                "python3",
+                str(PREFLIGHT),
+                "--workspace-root",
+                str(workspace),
+                "--bootstrap",
+                "--json",
+            ],
+            cwd=workspace,
+            env=env,
+            text=True,
+            capture_output=True,
+        )
+        return result, json.loads(result.stdout)
+
+    def test_preflight_reports_external_https_boundary_without_leaking_key(self):
+        secret = "never-print-this-worker-key"
+        result, report = self.run_preflight(
+            {
+                "PAPER_TRAIL_WORKER_BASE_URL": "https://api.example.com/v1",
+                "PAPER_TRAIL_WORKER_KEY": secret,
+                "PAPER_TRAIL_WORKER_MODEL": "small-model",
+            }
+        )
+
+        self.assertEqual(0, result.returncode)
+        self.assertTrue(report["capabilities"]["worker"])
+        self.assertEqual(
+            "external-https",
+            report["details"]["worker_endpoint"]["classification"],
+        )
+        self.assertTrue(
+            report["details"]["worker_endpoint"]["requires_desensitized"]
+        )
+        self.assertTrue(report["details"]["worker_endpoint"]["transport_allowed"])
+        self.assertNotIn(secret, result.stdout)
+        self.assertNotIn(secret, result.stderr)
+
+    def test_preflight_disables_external_http_worker(self):
+        _result, report = self.run_preflight(
+            {
+                "PAPER_TRAIL_WORKER_BASE_URL": "http://api.example.com/v1",
+                "PAPER_TRAIL_WORKER_KEY": "test-key",
+                "PAPER_TRAIL_WORKER_MODEL": "small-model",
+            }
+        )
+
+        self.assertEqual("degraded", report["status"])
+        self.assertFalse(report["capabilities"]["worker"])
+        self.assertEqual(
+            "external-http-blocked",
+            report["details"]["worker_endpoint"]["classification"],
+        )
+        self.assertFalse(report["details"]["worker_endpoint"]["transport_allowed"])
+
+    def test_preflight_lists_incomplete_worker_configuration(self):
+        _result, report = self.run_preflight(
+            {
+                "PAPER_TRAIL_WORKER_BASE_URL": "https://api.example.com/v1",
+                "PAPER_TRAIL_WORKER_MODEL": "small-model",
+            }
+        )
+
+        self.assertFalse(report["capabilities"]["worker"])
+        self.assertEqual(
+            ["PAPER_TRAIL_WORKER_KEY"],
+            report["details"]["worker_endpoint"]["missing_variables"],
+        )
+
     def test_preflight_blocks_an_incomplete_skill_copy(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -471,11 +723,11 @@ class PortablePreflightCliTest(unittest.TestCase):
             alternate_report = json.loads(alternate_result.stdout)
 
             self.assertEqual(
-                str(alternate_state),
+                str(alternate_state.resolve()),
                 alternate_report["paths"]["state_root"],
             )
             self.assertEqual(
-                str(alternate_research),
+                str(alternate_research.resolve()),
                 alternate_report["paths"]["research_root"],
             )
             self.assertTrue((alternate_state / "profile.md").is_file())

@@ -14,13 +14,13 @@
   extract_paper.py --selftest
 """
 import argparse
-import ipaddress
 import json
 import os
 import sys
 import urllib.request
 from pathlib import Path
-from urllib.parse import urlparse
+
+from worker_boundary import classify_worker_endpoint
 
 MAX_CHARS = 120_000
 
@@ -28,7 +28,9 @@ RULES = """你是论文结构化抽取器。按用户给的模板逐字段抽取
 规则:
 - 模板里每个字段都要填;论文没说的写"论文未述"。
 - 数字、模型规模、数据集、资源需求逐字摘原文,不做概括换算。
-- 可适用性对照用户给的 profile 硬约束打四档:直接可用 / 需微调(算力内)/ API 辅助(脱敏后)/ 不适用,并引用论文证据,区分"论文已证明"与"对该场景的外推"。
+- 可适用性只对照用户给的 profile 硬约束。约束齐备时打四档:直接可用 / 需微调(算力内)/ API 辅助(脱敏后)/ 不适用。
+- 判定所需的 profile 约束为 TBD 时不得假设满足,先标记"待确认",并指出待确认字段。
+- 引用论文证据,区分"论文已证明"与"对该场景的外推"。
 - 只依据所给正文,正文没有的依据不补。"""
 
 
@@ -82,40 +84,28 @@ def parse_args():
     return args
 
 
-def is_trusted_worker(base):
-    parsed = urlparse(base)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        sys.exit("PAPER_TRAIL_WORKER_BASE_URL 必须是有效的 http(s) URL")
-    if parsed.username or parsed.password:
-        sys.exit("PAPER_TRAIL_WORKER_BASE_URL 不得内嵌凭据")
-
-    host = parsed.hostname.casefold().rstrip(".")
-    configured_hosts = {
-        item.strip().casefold().rstrip(".")
-        for item in os.environ.get("PAPER_TRAIL_WORKER_TRUSTED_HOSTS", "").split(",")
-        if item.strip()
-    }
-    if host in configured_hosts:
-        return True
-    if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
-        return True
-    try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        return False
-    return address.is_private or address.is_loopback or address.is_link_local
+def classify_configured_worker(base):
+    return classify_worker_endpoint(
+        base,
+        os.environ.get("PAPER_TRAIL_WORKER_TRUSTED_HOSTS", ""),
+    )
 
 
 def enforce_data_boundary(base, desensitized):
-    parsed = urlparse(base)
-    if is_trusted_worker(base):
+    boundary = classify_configured_worker(base)
+    classification = boundary["classification"]
+    if classification == "invalid":
+        sys.exit("PAPER_TRAIL_WORKER_BASE_URL 必须是有效且不含凭据的 http(s) URL")
+    if classification == "unconfigured":
+        sys.exit("PAPER_TRAIL_WORKER_BASE_URL 未配置")
+    if boundary["trusted"]:
         return
-    if not desensitized:
+    if boundary["requires_desensitized"] and not desensitized:
         sys.exit(
             "外部 worker 端点需要 --desensitized，"
             "用于确认 paper 与 profile 已脱敏且允许出内网"
         )
-    if parsed.scheme != "https":
+    if not boundary["transport_allowed"]:
         sys.exit("外部 worker 端点只允许 HTTPS")
 
 
@@ -123,6 +113,9 @@ def main():
     args = parse_args()
     if args.selftest:
         base, key, model = get_config()
+        # Self-test does not send paper/profile, but still refuses an invalid or
+        # external plaintext endpoint so credentials are never sent over it.
+        enforce_data_boundary(base, desensitized=True)
         resp = chat(base, key, model, "回复两个字:正常")
         content = resp["choices"][0]["message"]["content"]
         print(f"selftest OK: model={model} reply={content!r} usage={resp.get('usage')}")

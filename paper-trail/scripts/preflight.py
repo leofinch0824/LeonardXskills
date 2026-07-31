@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from worker_boundary import classify_worker_endpoint
+
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_MCP = {
@@ -27,6 +29,7 @@ REQUIRED_SKILL_FILES = (
     "reference/verify.md",
     "scripts/extract_paper.py",
     "scripts/preflight.py",
+    "scripts/worker_boundary.py",
     "templates/brief.md",
     "templates/extraction.md",
     "templates/intake.md",
@@ -217,6 +220,35 @@ def check_live_mcp(workspace_root, warnings):
     return not disconnected
 
 
+def inspect_worker(warnings):
+    missing_variables = [name for name in WORKER_ENV if not os.environ.get(name)]
+    endpoint = classify_worker_endpoint(
+        os.environ.get("PAPER_TRAIL_WORKER_BASE_URL"),
+        os.environ.get("PAPER_TRAIL_WORKER_TRUSTED_HOSTS", ""),
+    )
+    details = {
+        **endpoint,
+        "missing_variables": missing_variables,
+    }
+    configured_count = len(WORKER_ENV) - len(missing_variables)
+    if 0 < configured_count < len(WORKER_ENV):
+        warnings.append(
+            "worker 配置不完整，缺少: " + ", ".join(missing_variables)
+        )
+    if endpoint["classification"] == "invalid":
+        warnings.append("worker endpoint 无效；将使用 Extract 降级梯")
+    elif endpoint["classification"] == "external-http-blocked":
+        warnings.append("worker endpoint 为外部 HTTP，已禁用；将使用 Extract 降级梯")
+    elif endpoint["classification"] == "external-https":
+        warnings.append("worker endpoint 为外部 HTTPS；抽取时必须确认脱敏")
+
+    available = (
+        not missing_variables
+        and endpoint["classification"] in {"trusted-local", "external-https"}
+    )
+    return available, details
+
+
 def build_report(args):
     paths = resolve_paths(args)
     errors = []
@@ -230,10 +262,11 @@ def build_report(args):
     if args.live_mcp:
         checks["live_mcp"] = check_live_mcp(paths["workspace_root"], warnings)
 
+    worker_available, worker_details = inspect_worker(warnings)
     capabilities = {
         "mcp": checks.get("live_mcp", checks["mcp_config"]),
         "s2_api_key": bool(os.environ.get("SEMANTIC_SCHOLAR_API_KEY")),
-        "worker": all(os.environ.get(name) for name in WORKER_ENV),
+        "worker": worker_available,
     }
     if errors:
         status = "blocked"
@@ -246,6 +279,9 @@ def build_report(args):
         "paths": {name: str(path) for name, path in paths.items()},
         "checks": checks,
         "capabilities": capabilities,
+        "details": {
+            "worker_endpoint": worker_details,
+        },
         "created": created,
         "warnings": warnings,
         "errors": errors,
@@ -263,6 +299,22 @@ def main():
             print(f"- {name}: {'OK' if passed else 'FAIL'}")
         for name, available in report["capabilities"].items():
             print(f"- {name}: {'available' if available else 'fallback required'}")
+        worker_endpoint = report["details"]["worker_endpoint"]
+        print(f"- worker endpoint: {worker_endpoint['classification']}")
+        if worker_endpoint["classification"] == "external-http-blocked":
+            boundary = "external HTTP blocked"
+        elif worker_endpoint["requires_desensitized"]:
+            boundary = "--desensitized required"
+        elif not worker_endpoint["transport_allowed"]:
+            boundary = "fallback required"
+        else:
+            boundary = "trusted local"
+        print(f"- worker data boundary: {boundary}")
+        if worker_endpoint["missing_variables"]:
+            print(
+                "- worker missing variables: "
+                + ", ".join(worker_endpoint["missing_variables"])
+            )
         for path in report["created"]:
             print(f"- created: {path}")
         for warning in report["warnings"]:
