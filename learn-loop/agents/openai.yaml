@@ -1,0 +1,6 @@
+interface:
+  display_name: "Learn Loop"
+  short_description: "中文十步学习闭环、来源取证、题库施考与费曼复述、可续考"
+  default_prompt: "Use $learn-loop to build a source-backed ten-step learning loop for a topic, then prepare it for later examination and Feynman practice."
+policy:
+  allow_implicit_invocation: false

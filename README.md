@@ -7,7 +7,7 @@
 把工作与学习中反复出现的方法沉淀为可复用、可验证、可移植的 Agent Skill。所有 skill 采用标准 `SKILL.md` 结构，强调明确的阶段契约、可追溯产物和自动化验证。
 
 ![platform](https://img.shields.io/badge/Codex-supported-2ea44f?style=flat-square)
-![skills](https://img.shields.io/badge/skills-1-informational?style=flat-square)
+![skills](https://img.shields.io/badge/skills-2-informational?style=flat-square)
 ![lang](https://img.shields.io/badge/%E4%B8%AD%E6%96%87%E4%BC%98%E5%85%88-blue?style=flat-square)
 ![standard](https://img.shields.io/badge/Agent_Skills-compatible-8957e5?style=flat-square)
 ![license](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)
@@ -19,6 +19,7 @@
 | skill | 用途 | 状态 |
 |---|---|:---:|
 | [**paper-trail**](#paper-trail) | 将业务或技术痛点翻译成学术问题，系统调研前沿论文，并产出带证据链、可追溯、可落地的方案简报 | 可用 |
+| [**learn-loop**](#learn-loop) | 将“十倍速学习”方法固化为有来源分级、阶段闸门、题库施考、费曼复述和复习队列的中文学习闭环 | 可用 |
 
 安装方式见「[安装](#安装)」，实际运行方式见「[快速开始](#快速开始)」。
 
@@ -85,6 +86,27 @@
 
 ---
 
+## learn-loop
+
+<a id="learn-loop"></a>
+
+`learn-loop` 是中文优先的十步学习闭环。它把五视角 STORM、来源等级、矛盾图谱、学习阶梯、主动回忆和费曼复述组织成一条可校验流水线：模式 A 生成 Markdown 事实源和单文件 HTML，用户之后说“考我”进入可续考的模式 B，说“给我讲/我来讲”进入真实的模式 C。用户说“十倍速学 X”或 `learn-10x-faster` 时也应触发它。
+
+```text
+开场两问 → 5 个独立视角 → 冲突/共识 → 简报 → 评审
+→ 资源/阶梯/课程 → 题库与费曼材料 → 速查表/HTML/复习队列
+```
+
+```bash
+python3 learn-loop/scripts/preflight.py \
+  --workspace-root /absolute/path/to/test-workspace \
+  --bootstrap --json
+```
+
+详细规则见 [`learn-loop/SKILL.md`](./learn-loop/SKILL.md)。运行产物默认写入目标工作区的 `.learn-loop/` 与 `learning/`；skill 包本身保持只读。`ten-step-learning/` 仍作为早期一次性 HTML 实现保留，`learn-loop` 是带校验与真实练习入口的版本。
+
+---
+
 ## 安装
 
 <a id="安装"></a>
@@ -95,15 +117,18 @@
 git clone https://github.com/leofinch0824/LeonardXskills.git
 mkdir -p ~/.codex/skills
 cp -R LeonardXskills/paper-trail ~/.codex/skills/
+cp -R LeonardXskills/learn-loop ~/.codex/skills/
 ```
 
-重新打开 Codex 会话后，通过 `$paper-trail` 显式调用。
+重新打开 Codex 会话后，通过 `$paper-trail` 或 `$learn-loop` 显式调用。
 
 **方式二 · 在仓库中直接使用**
 
 让 Agent 读取当前仓库的 `paper-trail/SKILL.md`，并明确要求按照该流程执行。此方式适合开发、调试和修改 skill。
 
 > `paper-trail` 默认保持 skill 包只读；Profile 写入目标工作区的 `.paper-trail/`，调研产物写入目标工作区的 `research/`。
+
+对学习任务，让 Agent 读取 `learn-loop/SKILL.md`；它会把运行状态写入目标工作区的 `.learn-loop/`，把 Markdown 事实源与 HTML 视图写入 `learning/`。
 
 ---
 
@@ -158,7 +183,14 @@ LeonardXskills/
 │   │   ├── worker_boundary.py   # Worker 端点与数据边界分类
 │   │   └── extract_paper.py     # OpenAI-compatible 结构化抽取 Worker
 │   └── templates/               # 每轮调研的标准化 Markdown 产物
+├── learn-loop/
+│   ├── SKILL.md                 # 十步流程、不变量、模式 A/B/C 与闸门
+│   ├── reference/               # 法条提示词、纪律附录与 HTML 指南
+│   ├── scripts/                 # preflight、结构校验和复习队列 CLI
+│   ├── templates/               # 十步、练习记录和运行状态模板
+│   └── assets/template.html     # 无外部依赖的单文件学习视图
 ├── tests/test_paper_trail.py     # 包契约、CLI、安全边界与工作流测试
+├── tests/test_learn_loop.py      # learn-loop 包契约与 CLI 测试
 ├── docs/                         # 设计说明与优化计划
 └── README.md
 ```
@@ -168,6 +200,7 @@ LeonardXskills/
 ```bash
 python3 -m unittest discover -s tests -v
 python3 -m py_compile paper-trail/scripts/*.py
+python3 -m py_compile learn-loop/scripts/*.py
 ```
 
 ---
