@@ -1,5 +1,3 @@
-<img src="https://github.com/leofinch0824.png" align="left" width="96" height="96" alt="LeonardX 头像">
-
 # LeonardX Skills
 
 中文优先的 Agent Skill 实践仓库 · Maintained by **[LeonardX](https://github.com/leofinch0824)**
