@@ -1,9 +1,18 @@
 __pycache__/
 *.py[cod]
-
+.DS_Store
 .venv
+.pytest_cache
 
-.agents
-.claude
-
-data
+# Local-only development and test content
+tests/
+.learn-loop/
+learning/
+learn-loop/
+paper-trail/
+ten-step-learning/
+.python-version
+AGENTS.md
+CLAUDE.md
+poetry.lock
+pyproject.toml
