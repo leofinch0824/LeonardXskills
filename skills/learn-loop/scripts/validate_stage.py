@@ -177,6 +177,19 @@ def validate_stage_0(text):
     ):
         if "已按默认值执行" not in text and "阻塞说明" not in text:
             violations.append("存在“未提供”画像字段，但缺少“已按默认值执行”或“阻塞说明”声明")
+    require_sections(text, ("前置判定",), violations)
+    verdict = field_value(text, "判定")
+    if not re.match(r"^(适合|调整后适合)", verdict):
+        violations.append(
+            f"前置判定的判定值须以“适合”或“调整后适合”开头（不适合时不创建运行目录），实际：{verdict or '缺失'}"
+        )
+    require_nonempty_fields(
+        text, ("判定理由", "调整说明", "资料探针"), violations, "前置判定"
+    )
+    if verdict.startswith("调整后适合"):
+        note = field_value(text, "调整说明").strip("。 ")
+        if note in {"无", "不适用", "无调整", "无需调整"}:
+            violations.append("判定为“调整后适合”时，调整说明不得为“无/不适用”类空泛值")
     if "模式 A" not in text and "模式A" not in text:
         violations.append("运行状态缺少模式 A 记录")
     return violations
@@ -558,6 +571,10 @@ def validate_html(run_dir):
         text = path.read_text(encoding="utf-8")
         if "{{" in text or "}}" in text:
             violations.append(f"HTML 残留占位符：{path.name}")
+        if "<noscript>" not in text:
+            violations.append(
+                f"HTML 缺少 noscript 降级（JS 禁用时全部视图应可读）：{path.name}"
+            )
         if not EXAM_STATUS_LINE.search(text):
             violations.append(
                 f"HTML 缺少施考状态行（须为“交互施考未进行”或“交互施考已完成 N 题”）：{path.name}"

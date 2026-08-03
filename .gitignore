@@ -6,13 +6,10 @@ __pycache__/
 
 # Local-only development and test content
 tests/
-.learn-loop/
 learning/
-learn-loop/
-paper-trail/
-ten-step-learning/
+.learn-loop
 .python-version
-AGENTS.md
-CLAUDE.md
+# AGENTS.md
+# CLAUDE.md
 poetry.lock
 pyproject.toml

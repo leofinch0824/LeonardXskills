@@ -22,9 +22,18 @@ description: >-
 7. **把原文提示词当法条。** 每步执行指令必须取自 [`reference/original-prompts.md`](reference/original-prompts.md)，只填 `{{主题}}`、`{{角色}}`、`{{水平}}`、`{{目标}}`（`{{水平}}`/`{{目标}}` 由纪律层第 6/7 步消费，不进入原文法条正文），再追加对应纪律附录；不得改写、删减原文要求。
 8. **只回灌用户确认的长期事实。** 开场学习画像默认不进 `learner-profile.md`（属本轮一次性场景）；仅当用户明确表示“记住这个”时才回灌，并引用原话和日期。`learner-profile.md` 不记录模型从分数推断的倾向；这类观察只留在本轮产物和复习队列。
 
+## 前置判断：适用性判定
+
+用户给出主题后、执行任何初始化之前，先做适用性判定（细则见 [`reference/pre-check.md`](reference/pre-check.md)）：
+
+- 复用开场已给信息，最多补问 3 个问题；判定只产出三种结论：适合 / 调整后适合 / 不适合。
+- 判定为不适合：不创建运行目录、不执行 preflight，直接向用户交付三行结论与贴近原意的替代路径；用户明确坚持时转为「调整后适合」，调整说明中记录原判定与已声明风险。
+- 判定移交模式 A 时，把判定、判定理由、调整说明、资料探针写入 `run-state.md` 的「前置判定」节；任何降级（未锚定、orchestrated、范围收窄）必须显式记录，不得隐性降级。
+- 前置判断不替代开场画像；画像三问仍在模式 A 中照常执行。
+
 ## 路径与初始化
 
-将当前文件所在目录称为 `<skill-root>`。按以下优先级解析目标：显式 `--workspace-root` → `LEARN_LOOP_WORKSPACE_ROOT` → Git 根 → 当前目录，得到 `<workspace-root>`。
+进入本节前必须已完成前置判断且结论为适合或调整后适合；判定为不适合时不执行本节任何动作。将当前文件所在目录称为 `<skill-root>`。按以下优先级解析目标：显式 `--workspace-root` → `LEARN_LOOP_WORKSPACE_ROOT` → Git 根 → 当前目录，得到 `<workspace-root>`。
 
 - `<state-root>`：`LEARN_LOOP_STATE_DIR`，默认 `<workspace-root>/.learn-loop`。
 - `<learning-root>`：`LEARN_LOOP_LEARNING_DIR`，默认 `<workspace-root>/learning`。
@@ -99,6 +108,7 @@ python3 <skill-root>/scripts/validate_stage.py --run-dir <run-dir> --all --json
 
 ## 资源导航
 
+- 前置判断细则（适用性信号、反问清单、意图拆解）：[`reference/pre-check.md`](reference/pre-check.md)
 - 原文十段提示词：[`reference/original-prompts.md`](reference/original-prompts.md)
 - 五视角与独立性：[`reference/perspectives.md`](reference/perspectives.md)
 - 冲突、共识与可靠性：[`reference/conflict.md`](reference/conflict.md)

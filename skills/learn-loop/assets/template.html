@@ -1,166 +1,1172 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{TOPIC}} · 十步学习闭环</title>
-  <style>
-    :root {
-      --ink: #17212b;
-      --muted: #607080;
-      --paper: #ffffff;
-      --canvas: #f3f6f8;
-      --rail: #1f3445;
-      --rail-2: #2d5268;
-      --accent: #d8a84e;
-      --line: #dbe3e8;
-      --soft: #eaf0f3;
-      --radius: 12px;
-      --rail-width: 260px;
-    }
-    * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0; background: var(--canvas); color: var(--ink);
-      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    }
-    a { color: inherit; }
-    .rail {
-      position: fixed; inset: 0 auto 0 0; width: var(--rail-width);
-      padding: 28px 18px; overflow-y: auto; background: var(--rail); color: #f7fafb;
-    }
-    .brand-label { color: var(--accent); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
-    .brand-title { margin: 8px 0 4px; font: 500 25px/1.15 Georgia, serif; overflow-wrap: anywhere; }
-    .brand-note { color: #c5d2da; font-size: 13px; }
-    .nav-group { margin: 25px 8px 7px; color: #9bb3c0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-    .nav a {
-      display: flex; gap: 9px; align-items: center; margin: 2px 0; padding: 8px 9px;
-      border-radius: 8px; color: #dfebf0; font-size: 13px; text-decoration: none;
-    }
-    .nav a:hover, .nav a.active { background: var(--rail-2); color: #fff; }
-    .nav .num { width: 22px; color: var(--accent); font-size: 12px; }
-    .main { margin-left: var(--rail-width); min-height: 100vh; }
-    .wrap { width: min(1040px, 100%); margin: 0 auto; padding: 54px 40px 100px; }
-    .view { display: none; }
-    .view.active { display: block; }
-    .kicker { color: var(--rail-2); font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-    h1, h2, h3, h4 { line-height: 1.2; }
-    h1 { margin: 8px 0 16px; font: 500 clamp(42px, 7vw, 76px)/1 Georgia, serif; }
-    h2 { margin: 0 0 12px; font: 500 34px/1.1 Georgia, serif; }
-    h3 { margin: 0 0 10px; font-size: 19px; }
-    h4 { margin: 20px 0 7px; font-size: 16px; }
-    .lead { max-width: 70ch; color: var(--muted); font-size: 18px; }
-    .step-head { border-bottom: 1px solid var(--line); margin-bottom: 22px; padding-bottom: 22px; }
-    .step-purpose { color: var(--muted); }
-    .step-map { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
-    .step-map a { display: block; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); text-decoration: none; }
-    .step-map a:hover { border-color: var(--accent); }
-    .step-number { color: var(--accent); font: 28px Georgia, serif; }
-    .card, .panel, .takeaways, .viz { margin: 14px 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
-    .card, .viz, .takeaways { padding: 20px; }
-    .viz:empty { display: none; }
-    .panel { overflow: hidden; }
-    .panel > summary { cursor: pointer; padding: 13px 16px; background: var(--soft); font-weight: 700; }
-    .panel-body { padding: 16px; }
-    .evidence { margin-top: 28px; }
-    .prompt { margin: 0; padding: 14px; overflow-x: auto; white-space: pre-wrap; border-radius: 8px; background: #22313d; color: #edf4f7; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .upstream { margin-bottom: 10px; color: var(--muted); font-size: 13px; }
-    .tag { display: inline-block; margin: 0 4px 4px 0; padding: 2px 8px; border-radius: 999px; background: var(--soft); color: var(--rail-2); font-size: 12px; }
-    .prose { color: var(--ink); }
-    .prose p { margin: 0 0 10px; }
-    .prose ul, .prose ol { margin-top: 6px; padding-left: 22px; }
-    .takeaways { border: 0; background: var(--rail); color: #f7fafb; }
-    .takeaways .kicker { color: var(--accent); }
-    .takeaways li { margin: 7px 0; }
-    .persona-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
-    .persona { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
-    .persona__role { color: var(--rail-2); font: 500 22px Georgia, serif; }
-    .ladder { display: grid; gap: 10px; }
-    .rung { padding: 15px; border-left: 5px solid var(--accent); border-radius: 8px; background: var(--soft); }
-    .hint { margin: 18px 0 10px; color: var(--muted); font-size: 14px; }
-    .flash { margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
-    .flash summary { cursor: pointer; padding: 13px 15px; font-weight: 600; }
-    .flash summary:hover { background: var(--soft); }
-    .flash .level { display: inline-block; margin-right: 8px; padding: 1px 8px; border-radius: 999px; background: var(--soft); color: var(--rail-2); font-size: 12px; font-weight: 400; }
-    .flash-answer { padding: 0 15px 15px; border-top: 1px solid var(--line); margin-top: 4px; padding-top: 12px; }
-    .status { padding: 12px 15px; border-left: 4px solid var(--accent); background: #fff8e9; color: #684d18; }
-    .footer { margin-top: 42px; padding-top: 22px; border-top: 1px solid var(--line); color: var(--muted); }
-    .menu { display: none; }
-    @media (max-width: 900px) {
-      .rail { transform: translateX(-100%); transition: transform .2s; z-index: 2; }
-      .rail.open { transform: translateX(0); }
-      .main { margin-left: 0; }
-      .wrap { padding: 70px 20px 80px; }
-      .menu { display: block; position: fixed; z-index: 3; top: 15px; left: 15px; border: 0; border-radius: 8px; padding: 9px 12px; background: var(--rail); color: #fff; cursor: pointer; }
-    }
-  </style>
-</head>
-<body>
-  <button class="menu" id="menu" aria-label="打开目录">☰</button>
-  <aside class="rail" id="rail">
-    <div class="brand-label">Learn Loop · 十步学习闭环</div>
-    <div class="brand-title">{{TOPIC}}</div>
-    <div class="brand-note">独立视角 × 取证 × 检索练习 × 费曼复述</div>
-    <nav class="nav" id="nav">
-      <div class="nav-group">总览</div>
-      <a href="#view-intro" data-view="view-intro"><span class="num">◎</span>学习地图</a>
-      <div class="nav-group">先学会</div>
-      <a href="#view-10" data-view="view-10"><span class="num">10</span>{{STEP_10_TITLE}}</a>
-      <a href="#view-7" data-view="view-7"><span class="num">07</span>{{STEP_7_TITLE}}</a>
-      <a href="#view-6" data-view="view-6"><span class="num">06</span>{{STEP_6_TITLE}}</a>
-      <div class="nav-group">再检验</div>
-      <a href="#view-9" data-view="view-9"><span class="num">09</span>{{STEP_9_TITLE}}</a>
-      <a href="#view-8" data-view="view-8"><span class="num">08</span>{{STEP_8_TITLE}}</a>
-      <div class="nav-group">取证与溯源</div>
-      <a href="#view-1" data-view="view-1"><span class="num">01</span>{{STEP_1_TITLE}}</a>
-      <a href="#view-2" data-view="view-2"><span class="num">02</span>{{STEP_2_TITLE}}</a>
-      <a href="#view-3" data-view="view-3"><span class="num">03</span>{{STEP_3_TITLE}}</a>
-      <a href="#view-4" data-view="view-4"><span class="num">04</span>{{STEP_4_TITLE}}</a>
-      <a href="#view-5" data-view="view-5"><span class="num">05</span>{{STEP_5_TITLE}}</a>
-      <div class="nav-group">收尾</div>
-      <a href="#view-closing" data-view="view-closing"><span class="num">∞</span>回顾与下一轮</a>
-    </nav>
-  </aside>
-  <main class="main"><div class="wrap">
-    <section class="view active" id="view-intro">
-      <div class="kicker">一个可校验的学习闭环</div>
-      <h1>{{TOPIC}}</h1>
-      <p class="lead">{{METHOD_INTRO}}</p>
-      <div class="card"><h3>十步地图</h3><div class="step-map">{{STEP_MAP}}</div></div>
-    </section>
-
-    <section class="view" id="view-10"><div class="step-head"><div class="kicker">第 10 步</div><h2>{{STEP_10_TITLE}}</h2><p class="step-purpose">{{STEP_10_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_10_TAKEAWAYS}}</div><div class="viz">{{STEP_10_VIZ}}</div><div class="prose">{{STEP_10_OUTPUT}}</div><h3>快问快答</h3><p class="hint">先自己回答，再展开对照。</p>{{STEP_10_QUIZ}}<details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_10_INPUT}}</div></details></section>
-    <section class="view" id="view-7"><div class="step-head"><div class="kicker">第 7 步</div><h2>{{STEP_7_TITLE}}</h2><p class="step-purpose">{{STEP_7_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_7_TAKEAWAYS}}</div><div class="viz">{{STEP_7_VIZ}}</div><div class="prose">{{STEP_7_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_7_INPUT}}</div></details></section>
-    <section class="view" id="view-6"><div class="step-head"><div class="kicker">第 6 步</div><h2>{{STEP_6_TITLE}}</h2><p class="step-purpose">{{STEP_6_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_6_TAKEAWAYS}}</div><div class="viz">{{STEP_6_VIZ}}</div><div class="prose">{{STEP_6_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_6_INPUT}}</div></details></section>
-
-    <section class="view" id="view-9"><div class="step-head"><div class="kicker">第 9 步</div><h2>{{STEP_9_TITLE}}</h2><p class="step-purpose">{{STEP_9_PURPOSE}}</p></div><div class="status">交互费曼会话未进行，对我说“给我讲”或“我来讲”即可开始。</div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_9_TAKEAWAYS}}</div><div class="viz">{{STEP_9_VIZ}}</div><div class="prose">{{STEP_9_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_9_INPUT}}</div></details></section>
-    <section class="view" id="view-8"><div class="step-head"><div class="kicker">第 8 步</div><h2>{{STEP_8_TITLE}}</h2><p class="step-purpose">{{STEP_8_PURPOSE}}</p></div><div class="status">交互施考未进行，对我说“考我”即可开始。</div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_8_TAKEAWAYS}}</div><div class="viz">{{STEP_8_VIZ}}</div><p class="hint">每题先自己作答，再展开参考答案与评分标准对照打分。</p>{{STEP_8_CARDS}}<details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_8_INPUT}}</div></details></section>
-
-    <section class="view" id="view-1"><div class="step-head"><div class="kicker">第 1 步</div><h2>{{STEP_1_TITLE}}</h2><p class="step-purpose">{{STEP_1_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_1_TAKEAWAYS}}</div><div class="viz">{{STEP_1_VIZ}}</div><div class="prose">{{STEP_1_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_1_INPUT}}</div></details></section>
-    <section class="view" id="view-2"><div class="step-head"><div class="kicker">第 2 步</div><h2>{{STEP_2_TITLE}}</h2><p class="step-purpose">{{STEP_2_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_2_TAKEAWAYS}}</div><div class="viz">{{STEP_2_VIZ}}</div><div class="prose">{{STEP_2_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_2_INPUT}}</div></details></section>
-    <section class="view" id="view-3"><div class="step-head"><div class="kicker">第 3 步</div><h2>{{STEP_3_TITLE}}</h2><p class="step-purpose">{{STEP_3_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_3_TAKEAWAYS}}</div><div class="viz">{{STEP_3_VIZ}}</div><div class="prose">{{STEP_3_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_3_INPUT}}</div></details></section>
-    <section class="view" id="view-4"><div class="step-head"><div class="kicker">第 4 步</div><h2>{{STEP_4_TITLE}}</h2><p class="step-purpose">{{STEP_4_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_4_TAKEAWAYS}}</div><div class="viz">{{STEP_4_VIZ}}</div><div class="prose">{{STEP_4_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_4_INPUT}}</div></details></section>
-    <section class="view" id="view-5"><div class="step-head"><div class="kicker">第 5 步</div><h2>{{STEP_5_TITLE}}</h2><p class="step-purpose">{{STEP_5_PURPOSE}}</p></div><div class="takeaways"><div class="kicker">本步提炼</div>{{STEP_5_TAKEAWAYS}}</div><div class="viz">{{STEP_5_VIZ}}</div><div class="prose">{{STEP_5_OUTPUT}}</div><details class="panel evidence"><summary>取证 · 提示词与上游</summary><div class="panel-body">{{STEP_5_INPUT}}</div></details></section>
-
-    <section class="view" id="view-closing"><div class="step-head"><div class="kicker">收尾</div><h2>把一次学习变成下一次复习</h2><p class="lead">{{CLOSING_INTRO}}</p></div><div class="viz">{{LOOP_DIAGRAM}}</div><div class="card prose">{{CLOSING_DELIVERABLES}}</div><div class="footer">Markdown 产物是事实源；施考、复述和复习会话按需继续。</div></section>
-  </div></main>
-  <script>
-    (() => {
-      const rail = document.getElementById('rail');
-      const menu = document.getElementById('menu');
-      const links = [...document.querySelectorAll('[data-view]')];
-      const views = [...document.querySelectorAll('.view')];
-      function show(id) {
-        views.forEach(view => view.classList.toggle('active', view.id === id));
-        links.forEach(link => link.classList.toggle('active', link.dataset.view === id));
-        if (history.replaceState) history.replaceState(null, '', '#' + id);
-        rail.classList.remove('open');
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{TOPIC}} · 十步学习闭环</title>
+    <style>
+      :root {
+        --ink: #17212b;
+        --muted: #607080;
+        --paper: #ffffff;
+        --canvas: #f3f6f8;
+        --rail: #1f3445;
+        --rail-2: #2d5268;
+        --accent: #d8a84e;
+        --line: #dbe3e8;
+        --soft: #eaf0f3;
+        --radius: 12px;
+        --rail-width: 260px;
       }
-      links.forEach(link => link.addEventListener('click', event => { event.preventDefault(); show(link.dataset.view); }));
-      menu.addEventListener('click', () => rail.classList.toggle('open'));
-      const initial = location.hash.slice(1);
-      show(views.some(view => view.id === initial) ? initial : 'view-intro');
-    })();
-  </script>
-</body>
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          16px/1.6 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+      a {
+        color: inherit;
+      }
+      .rail {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: var(--rail-width);
+        padding: 28px 18px;
+        overflow-y: auto;
+        background: var(--rail);
+        color: #f7fafb;
+      }
+      .brand-label {
+        color: var(--accent);
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .brand-title {
+        margin: 8px 0 4px;
+        font:
+          500 25px/1.15 Georgia,
+          serif;
+        overflow-wrap: anywhere;
+      }
+      .brand-note {
+        color: #c5d2da;
+        font-size: 13px;
+      }
+      .search {
+        margin: 18px 0 4px;
+      }
+      .search input {
+        width: 100%;
+        border: 1px solid #587184;
+        border-radius: 8px;
+        padding: 9px 10px;
+        background: #162c3c;
+        color: #fff;
+        font: inherit;
+      }
+      .search input::placeholder {
+        color: #9bb3c0;
+      }
+      .search-results {
+        display: grid;
+        gap: 5px;
+        margin-top: 7px;
+      }
+      .search-results:empty {
+        display: none;
+      }
+      .search-result {
+        border: 0;
+        border-radius: 7px;
+        padding: 8px;
+        background: var(--rail-2);
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-size: 12px;
+        text-align: left;
+      }
+      .search-result strong,
+      .search-result span {
+        display: block;
+      }
+      .search-result span {
+        margin-top: 2px;
+        color: #c5d2da;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .nav-group {
+        margin: 25px 8px 7px;
+        color: #9bb3c0;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .nav a {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        margin: 2px 0;
+        padding: 8px 9px;
+        border-radius: 8px;
+        color: #dfebf0;
+        font-size: 13px;
+        text-decoration: none;
+      }
+      .nav a:hover,
+      .nav a.active {
+        background: var(--rail-2);
+        color: #fff;
+      }
+      .nav .num {
+        position: relative;
+        width: 22px;
+        color: var(--accent);
+        font-size: 12px;
+      }
+      .nav a.read .num::after {
+        position: absolute;
+        top: 0;
+        right: 1px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #79c99e;
+        content: "";
+      }
+      .main {
+        margin-left: var(--rail-width);
+        min-height: 100vh;
+      }
+      .wrap {
+        width: min(1040px, 100%);
+        margin: 0 auto;
+        padding: 54px 40px 100px;
+      }
+      .view {
+        display: none;
+      }
+      .view.active {
+        display: block;
+      }
+      .kicker {
+        color: var(--rail-2);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        line-height: 1.2;
+      }
+      h1 {
+        margin: 8px 0 16px;
+        font:
+          500 clamp(42px, 7vw, 76px)/1 Georgia,
+          serif;
+      }
+      h2 {
+        margin: 0 0 12px;
+        font:
+          500 34px/1.1 Georgia,
+          serif;
+      }
+      h3 {
+        margin: 0 0 10px;
+        font-size: 19px;
+      }
+      h4 {
+        margin: 20px 0 7px;
+        font-size: 16px;
+      }
+      .lead {
+        max-width: 70ch;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      .step-head {
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 22px;
+        padding-bottom: 22px;
+      }
+      .read-toggle {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 11px;
+        background: var(--paper);
+        color: var(--rail-2);
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+      }
+      .read-toggle[aria-pressed="true"] {
+        border-color: #79c99e;
+        background: #edf8f2;
+        color: #246345;
+      }
+      .step-purpose {
+        color: var(--muted);
+      }
+      .step-map {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+      }
+      .step-map a {
+        display: block;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+        text-decoration: none;
+      }
+      .step-map a:hover {
+        border-color: var(--accent);
+      }
+      .step-map a.read::after {
+        float: right;
+        color: #31835a;
+        content: "✓ 已读";
+        font-size: 12px;
+      }
+      .step-number {
+        color: var(--accent);
+        font:
+          28px Georgia,
+          serif;
+      }
+      .card,
+      .panel,
+      .takeaways,
+      .viz {
+        margin: 14px 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+      }
+      .card,
+      .viz,
+      .takeaways {
+        padding: 20px;
+      }
+      .viz:empty {
+        display: none;
+      }
+      .panel {
+        overflow: hidden;
+      }
+      .panel > summary {
+        cursor: pointer;
+        padding: 13px 16px;
+        background: var(--soft);
+        font-weight: 700;
+      }
+      .panel-body {
+        padding: 16px;
+      }
+      .evidence {
+        margin-top: 28px;
+      }
+      .prompt {
+        margin: 0;
+        padding: 14px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        border-radius: 8px;
+        background: #22313d;
+        color: #edf4f7;
+        font:
+          13px/1.6 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+      }
+      .upstream {
+        margin-bottom: 10px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .tag {
+        display: inline-block;
+        margin: 0 4px 4px 0;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: var(--rail-2);
+        font-size: 12px;
+      }
+      .prose {
+        color: var(--ink);
+      }
+      .prose p {
+        margin: 0 0 10px;
+      }
+      .prose ul,
+      .prose ol {
+        margin-top: 6px;
+        padding-left: 22px;
+      }
+      .prose table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .takeaways {
+        border: 0;
+        background: var(--rail);
+        color: #f7fafb;
+      }
+      .takeaways .kicker {
+        color: var(--accent);
+      }
+      .takeaways li {
+        margin: 7px 0;
+      }
+      .persona-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 12px;
+      }
+      .persona {
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+      }
+      .persona__role {
+        color: var(--rail-2);
+        font:
+          500 22px Georgia,
+          serif;
+      }
+      .ladder {
+        display: grid;
+        gap: 10px;
+      }
+      .rung {
+        padding: 15px;
+        border-left: 5px solid var(--accent);
+        border-radius: 8px;
+        background: var(--soft);
+      }
+      .hint {
+        margin: 18px 0 10px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .flash {
+        margin: 10px 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--paper);
+      }
+      .deck {
+        display: flex;
+        flex-direction: column;
+      }
+      .deck.only-weak .flash[data-self="known"] {
+        display: none;
+      }
+      .deck-tools {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin: 12px 0;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+      }
+      .deck-tools button,
+      .self-assessment button {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 6px 10px;
+        background: var(--paper);
+        color: var(--ink);
+        cursor: pointer;
+        font: inherit;
+        font-size: 13px;
+      }
+      .deck-progress {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .flash[data-self="known"] {
+        border-color: #79c99e;
+      }
+      .flash[data-self="unknown"] {
+        border-color: #dc8b79;
+      }
+      .flash[data-self="known"] > summary::after {
+        color: #31835a;
+        content: " ✓";
+      }
+      .flash[data-self="unknown"] > summary::after {
+        color: #a44432;
+        content: " ✗";
+      }
+      .flash summary {
+        cursor: pointer;
+        padding: 13px 15px;
+        font-weight: 600;
+      }
+      .flash summary:hover {
+        background: var(--soft);
+      }
+      .flash .level {
+        display: inline-block;
+        margin-right: 8px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: var(--rail-2);
+        font-size: 12px;
+        font-weight: 400;
+      }
+      .flash-answer {
+        padding: 0 15px 15px;
+        border-top: 1px solid var(--line);
+        margin-top: 4px;
+        padding-top: 12px;
+      }
+      .self-assessment {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        align-items: center;
+        margin-top: 14px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--line);
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .self-assessment button[aria-pressed="true"] {
+        border-color: var(--rail-2);
+        background: var(--rail-2);
+        color: #fff;
+      }
+      .hit-flash {
+        animation: hit-flash 1.2s ease-out;
+      }
+      @keyframes hit-flash {
+        from {
+          outline: 4px solid var(--accent);
+          outline-offset: 6px;
+        }
+        to {
+          outline: 4px solid transparent;
+          outline-offset: 12px;
+        }
+      }
+      .status {
+        padding: 12px 15px;
+        border-left: 4px solid var(--accent);
+        background: #fff8e9;
+        color: #684d18;
+      }
+      .footer {
+        margin-top: 42px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+      }
+      .menu {
+        display: none;
+      }
+      @media (max-width: 900px) {
+        .rail {
+          transform: translateX(-100%);
+          transition: transform 0.2s;
+          z-index: 2;
+        }
+        .rail.open {
+          transform: translateX(0);
+        }
+        .main {
+          margin-left: 0;
+        }
+        .wrap {
+          padding: 70px 20px 80px;
+        }
+        .menu {
+          display: block;
+          position: fixed;
+          z-index: 3;
+          top: 15px;
+          left: 15px;
+          border: 0;
+          border-radius: 8px;
+          padding: 9px 12px;
+          background: var(--rail);
+          color: #fff;
+          cursor: pointer;
+        }
+      }
+      @media print {
+        .view {
+          display: block !important;
+          break-before: page;
+        }
+        .view:first-child {
+          break-before: auto;
+        }
+        .rail,
+        .menu,
+        .search,
+        .deck-tools,
+        .read-toggle,
+        .self-assessment {
+          display: none !important;
+        }
+        details > :not(summary) {
+          display: block !important;
+        }
+        .main {
+          margin: 0;
+        }
+        .wrap {
+          width: 100%;
+          padding: 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+    <noscript><style>.view{display:block}.rail{position:static;width:auto}.main{margin-left:0}.menu,.search{display:none}</style></noscript>
+  </head>
+  <body>
+    <button
+      class="menu"
+      id="menu"
+      aria-label="打开目录"
+      aria-controls="rail"
+      aria-expanded="false"
+    >
+      ☰
+    </button>
+    <aside class="rail" id="rail">
+      <div class="brand-label">Learn Loop · 十步学习闭环</div>
+      <div class="brand-title">{{TOPIC}}</div>
+      <div class="brand-note">独立视角 × 取证 × 检索练习 × 费曼复述</div>
+      <div class="search">
+        <label class="sr-only" for="search">搜索全部章节</label>
+        <input id="search" type="search" placeholder="搜索全部章节" autocomplete="off" />
+        <div class="search-results" id="search-results" aria-live="polite"></div>
+      </div>
+      <nav class="nav" id="nav">
+        <div class="nav-group">总览</div>
+        <a href="#view-intro" data-view="view-intro"
+          ><span class="num">◎</span>学习地图</a
+        >
+        <div class="nav-group">先学会</div>
+        <a href="#view-10" data-view="view-10"
+          ><span class="num">10</span>{{STEP_10_TITLE}}</a
+        >
+        <a href="#view-7" data-view="view-7"
+          ><span class="num">07</span>{{STEP_7_TITLE}}</a
+        >
+        <a href="#view-6" data-view="view-6"
+          ><span class="num">06</span>{{STEP_6_TITLE}}</a
+        >
+        <div class="nav-group">再检验</div>
+        <a href="#view-9" data-view="view-9"
+          ><span class="num">09</span>{{STEP_9_TITLE}}</a
+        >
+        <a href="#view-8" data-view="view-8"
+          ><span class="num">08</span>{{STEP_8_TITLE}}</a
+        >
+        <div class="nav-group">取证与溯源</div>
+        <a href="#view-1" data-view="view-1"
+          ><span class="num">01</span>{{STEP_1_TITLE}}</a
+        >
+        <a href="#view-2" data-view="view-2"
+          ><span class="num">02</span>{{STEP_2_TITLE}}</a
+        >
+        <a href="#view-3" data-view="view-3"
+          ><span class="num">03</span>{{STEP_3_TITLE}}</a
+        >
+        <a href="#view-4" data-view="view-4"
+          ><span class="num">04</span>{{STEP_4_TITLE}}</a
+        >
+        <a href="#view-5" data-view="view-5"
+          ><span class="num">05</span>{{STEP_5_TITLE}}</a
+        >
+        <div class="nav-group">收尾</div>
+        <a href="#view-closing" data-view="view-closing"
+          ><span class="num">∞</span>回顾与下一轮</a
+        >
+      </nav>
+    </aside>
+    <main class="main" id="main">
+      <div class="wrap">
+        <section class="view active" id="view-intro">
+          <div class="kicker">一个可校验的学习闭环</div>
+          <h1>{{TOPIC}}</h1>
+          <p class="lead">{{METHOD_INTRO}}</p>
+          <div class="card">
+            <h3>十步地图</h3>
+            <div class="step-map">{{STEP_MAP}}</div>
+          </div>
+        </section>
+
+        <section class="view" id="view-10">
+          <div class="step-head">
+            <div class="kicker">第 10 步</div>
+            <h2>{{STEP_10_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_10_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_10_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_10_VIZ}}</div>
+          <div class="prose">{{STEP_10_OUTPUT}}</div>
+          <h3>快问快答</h3>
+          <p class="hint">先自己回答，再展开对照。</p>
+          <div class="deck" id="deck-10">{{STEP_10_QUIZ}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_10_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-7">
+          <div class="step-head">
+            <div class="kicker">第 7 步</div>
+            <h2>{{STEP_7_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_7_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_7_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_7_VIZ}}</div>
+          <div class="prose">{{STEP_7_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_7_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-6">
+          <div class="step-head">
+            <div class="kicker">第 6 步</div>
+            <h2>{{STEP_6_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_6_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_6_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_6_VIZ}}</div>
+          <div class="prose">{{STEP_6_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_6_INPUT}}</div>
+          </details>
+        </section>
+
+        <section class="view" id="view-9">
+          <div class="step-head">
+            <div class="kicker">第 9 步</div>
+            <h2>{{STEP_9_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_9_PURPOSE}}</p>
+          </div>
+          <div class="status">
+            交互费曼会话未进行，对我说“给我讲”或“我来讲”即可开始。
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_9_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_9_VIZ}}</div>
+          <div class="prose">{{STEP_9_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_9_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-8">
+          <div class="step-head">
+            <div class="kicker">第 8 步</div>
+            <h2>{{STEP_8_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_8_PURPOSE}}</p>
+          </div>
+          <div class="status">交互施考未进行，对我说“考我”即可开始。</div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_8_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_8_VIZ}}</div>
+          <p class="hint">每题先自己作答，再展开参考答案与评分标准对照打分。</p>
+          <div class="deck" id="deck-8">{{STEP_8_CARDS}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_8_INPUT}}</div>
+          </details>
+        </section>
+
+        <section class="view" id="view-1">
+          <div class="step-head">
+            <div class="kicker">第 1 步</div>
+            <h2>{{STEP_1_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_1_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_1_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_1_VIZ}}</div>
+          <div class="prose">{{STEP_1_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_1_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-2">
+          <div class="step-head">
+            <div class="kicker">第 2 步</div>
+            <h2>{{STEP_2_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_2_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_2_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_2_VIZ}}</div>
+          <div class="prose">{{STEP_2_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_2_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-3">
+          <div class="step-head">
+            <div class="kicker">第 3 步</div>
+            <h2>{{STEP_3_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_3_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_3_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_3_VIZ}}</div>
+          <div class="prose">{{STEP_3_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_3_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-4">
+          <div class="step-head">
+            <div class="kicker">第 4 步</div>
+            <h2>{{STEP_4_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_4_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_4_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_4_VIZ}}</div>
+          <div class="prose">{{STEP_4_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_4_INPUT}}</div>
+          </details>
+        </section>
+        <section class="view" id="view-5">
+          <div class="step-head">
+            <div class="kicker">第 5 步</div>
+            <h2>{{STEP_5_TITLE}}</h2>
+            <p class="step-purpose">{{STEP_5_PURPOSE}}</p>
+          </div>
+          <div class="takeaways">
+            <div class="kicker">本步提炼</div>
+            {{STEP_5_TAKEAWAYS}}
+          </div>
+          <div class="viz">{{STEP_5_VIZ}}</div>
+          <div class="prose">{{STEP_5_OUTPUT}}</div>
+          <details class="panel evidence">
+            <summary>取证 · 提示词与上游</summary>
+            <div class="panel-body">{{STEP_5_INPUT}}</div>
+          </details>
+        </section>
+
+        <section class="view" id="view-closing">
+          <div class="step-head">
+            <div class="kicker">收尾</div>
+            <h2>把一次学习变成下一次复习</h2>
+            <p class="lead">{{CLOSING_INTRO}}</p>
+          </div>
+          <div class="viz">{{LOOP_DIAGRAM}}</div>
+          <div class="card prose">{{CLOSING_DELIVERABLES}}</div>
+          <div class="footer">
+            Markdown 产物是事实源；施考、复述和复习会话按需继续。
+          </div>
+        </section>
+      </div>
+    </main>
+    <script>
+      (() => {
+        const rail = document.getElementById("rail");
+        const menu = document.getElementById("menu");
+        const main = document.getElementById("main");
+        const search = document.getElementById("search");
+        const searchResults = document.getElementById("search-results");
+        const links = [
+          ...document.querySelectorAll(
+            "[data-view], .step-map a[href^='#view-']",
+          ),
+        ];
+        const views = [...document.querySelectorAll(".view")];
+
+        function blankState() {
+          return {
+            cards: {},
+            read: {},
+          };
+        }
+
+        const storageKey = "learn-loop:" + document.title;
+        function loadState() {
+          const fallback = blankState();
+          try {
+            const saved = localStorage.getItem(storageKey);
+            if (!saved) return fallback;
+            const parsed = JSON.parse(saved);
+            if (!parsed.cards || typeof parsed.cards !== "object") {
+              parsed.cards = {};
+            }
+            if (!parsed.read || typeof parsed.read !== "object") {
+              parsed.read = {};
+            }
+            return parsed;
+          } catch (error) {
+            return fallback;
+          }
+        }
+
+        const state = loadState();
+        function saveState() {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(state));
+          } catch (error) {
+            // state remains available in memory for this page session
+          }
+        }
+
+        function viewIdForLink(link) {
+          if (link.dataset.view) return link.dataset.view;
+          return link.getAttribute("href").slice(1);
+        }
+
+        function closeMenu() {
+          rail.classList.remove("open");
+          menu.setAttribute("aria-expanded", "false");
+          menu.setAttribute("aria-label", "打开目录");
+        }
+
+        function show(id) {
+          const target = views.find((view) => view.id === id);
+          if (!target) return;
+          views.forEach((view) => {
+            view.classList.toggle("active", view === target);
+          });
+          links.forEach((link) => {
+            const active = viewIdForLink(link) === id;
+            link.classList.toggle("active", active);
+            if (active) {
+              link.setAttribute("aria-current", "page");
+            } else {
+              link.removeAttribute("aria-current");
+            }
+          });
+          try {
+            if (history.replaceState) history.replaceState(null, "", "#" + id);
+          } catch (error) {
+            location.hash = id;
+          }
+          closeMenu();
+          window.scrollTo(0, 0);
+          const heading = target.querySelector("h1, h2");
+          if (heading) {
+            heading.tabIndex = -1;
+            try {
+              heading.focus({ preventScroll: true });
+            } catch (error) {
+              heading.focus();
+            }
+          }
+        }
+
+        links.forEach((link) => {
+          link.addEventListener("click", (event) => {
+            event.preventDefault();
+            show(viewIdForLink(link));
+          });
+        });
+
+        menu.addEventListener("click", () => {
+          const open = !rail.classList.contains("open");
+          rail.classList.toggle("open", open);
+          menu.setAttribute("aria-expanded", String(open));
+          menu.setAttribute("aria-label", open ? "关闭目录" : "打开目录");
+        });
+        main.addEventListener("click", closeMenu);
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") closeMenu();
+        });
+
+        function hashText(text) {
+          let hash = 5381;
+          for (let index = 0; index < text.length; index += 1) {
+            hash = (hash * 33) ^ text.charCodeAt(index);
+          }
+          return (hash >>> 0).toString(36);
+        }
+
+        function setupDeck(deck) {
+          const cards = [...deck.children].filter((child) =>
+            child.matches(".flash"),
+          );
+          if (!cards.length) return;
+
+          const toolbar = document.createElement("div");
+          toolbar.className = "deck-tools";
+          const shuffleButton = document.createElement("button");
+          shuffleButton.type = "button";
+          shuffleButton.textContent = "洗牌重练";
+          const weakButton = document.createElement("button");
+          weakButton.type = "button";
+          weakButton.textContent = "只看未掌握";
+          weakButton.setAttribute("aria-pressed", "false");
+          const collapseButton = document.createElement("button");
+          collapseButton.type = "button";
+          collapseButton.textContent = "全部收起";
+          const progress = document.createElement("span");
+          progress.className = "deck-progress";
+          toolbar.append(shuffleButton, weakButton, collapseButton, progress);
+          deck.before(toolbar);
+
+          const entries = [];
+          cards.forEach((card) => {
+            const summary = card.querySelector("summary");
+            const answer = card.querySelector(".flash-answer");
+            if (!summary || !answer) return;
+            const cardKey = deck.id + ":" + hashText(summary.textContent.trim());
+            const assessment = document.createElement("div");
+            assessment.className = "self-assessment";
+            const note = document.createElement("span");
+            note.textContent = "自评仅存本机浏览器，与施考成绩无关。";
+            const knownButton = document.createElement("button");
+            knownButton.type = "button";
+            knownButton.textContent = "答对了";
+            const unknownButton = document.createElement("button");
+            unknownButton.type = "button";
+            unknownButton.textContent = "答错了";
+            assessment.append(note, knownButton, unknownButton);
+            answer.append(assessment);
+            entries.push({
+              card,
+              cardKey,
+              knownButton,
+              unknownButton,
+            });
+
+            function mark(value) {
+              state.cards[cardKey] = value;
+              saveState();
+              render();
+            }
+            knownButton.addEventListener("click", () => mark("known"));
+            unknownButton.addEventListener("click", () => mark("unknown"));
+          });
+
+          function render() {
+            let knownCount = 0;
+            entries.forEach((entry) => {
+              const value = state.cards[entry.cardKey];
+              if (value === "known" || value === "unknown") {
+                entry.card.dataset.self = value;
+              } else {
+                delete entry.card.dataset.self;
+              }
+              if (value === "known") knownCount += 1;
+              entry.knownButton.setAttribute(
+                "aria-pressed",
+                String(value === "known"),
+              );
+              entry.unknownButton.setAttribute(
+                "aria-pressed",
+                String(value === "unknown"),
+              );
+            });
+            progress.textContent = "已掌握 " + knownCount + "/" + entries.length;
+          }
+
+          shuffleButton.addEventListener("click", () => {
+            const shuffled = [...cards];
+            for (let index = shuffled.length - 1; index > 0; index -= 1) {
+              const other = Math.floor(Math.random() * (index + 1));
+              const current = shuffled[index];
+              shuffled[index] = shuffled[other];
+              shuffled[other] = current;
+            }
+            shuffled.forEach((card, index) => {
+              card.style.order = String(index);
+              card.open = false;
+            });
+          });
+          weakButton.addEventListener("click", () => {
+            const onlyWeak = deck.classList.toggle("only-weak");
+            weakButton.setAttribute("aria-pressed", String(onlyWeak));
+            weakButton.textContent = onlyWeak ? "查看全部" : "只看未掌握";
+          });
+          collapseButton.addEventListener("click", () => {
+            cards.forEach((card) => {
+              card.open = false;
+            });
+          });
+          render();
+        }
+
+        document.querySelectorAll(".deck").forEach(setupDeck);
+
+        function syncReadState(view, button) {
+          const value = Boolean(state.read["read:" + view.id]);
+          button.textContent = value ? "✓ 本章已读" : "标记本章已读";
+          button.setAttribute("aria-pressed", String(value));
+          links.forEach((link) => {
+            if (viewIdForLink(link) === view.id) {
+              link.classList.toggle("read", value);
+            }
+          });
+        }
+
+        views.forEach((view) => {
+          const head = view.querySelector(".step-head");
+          if (!head) return;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "read-toggle";
+          head.append(button);
+          button.addEventListener("click", () => {
+            const key = "read:" + view.id;
+            state.read[key] = !state.read[key];
+            saveState();
+            syncReadState(view, button);
+          });
+          syncReadState(view, button);
+        });
+
+        const searchIndex = views.map((view) => {
+          const heading = view.querySelector("h1, h2");
+          return {
+            view,
+            title: heading ? heading.textContent.trim() : view.id,
+            text: view.textContent.replace(/\s+/g, " ").trim(),
+          };
+        });
+
+        function showSearchResults(query) {
+          searchResults.replaceChildren();
+          const normalized = query.trim().toLocaleLowerCase();
+          if (normalized.length < 2) return;
+          searchIndex.forEach((entry) => {
+            const haystack = entry.text.toLocaleLowerCase();
+            const matchAt = haystack.indexOf(normalized);
+            if (matchAt < 0) return;
+            const start = Math.max(0, matchAt - 30);
+            const end = Math.min(entry.text.length, matchAt + normalized.length + 30);
+            const snippet =
+              (start > 0 ? "…" : "") +
+              entry.text.slice(start, end) +
+              (end < entry.text.length ? "…" : "");
+            const result = document.createElement("button");
+            result.type = "button";
+            result.className = "search-result";
+            const title = document.createElement("strong");
+            title.textContent = entry.title;
+            const preview = document.createElement("span");
+            preview.textContent = snippet;
+            result.append(title, preview);
+            result.addEventListener("click", () => {
+              show(entry.view.id);
+              entry.view.classList.remove("hit-flash");
+              void entry.view.offsetWidth;
+              entry.view.classList.add("hit-flash");
+              window.setTimeout(() => {
+                entry.view.classList.remove("hit-flash");
+              }, 1300);
+            });
+            searchResults.append(result);
+          });
+        }
+
+        search.addEventListener("input", () => {
+          showSearchResults(search.value);
+        });
+
+        let printState = null;
+        window.addEventListener("beforeprint", () => {
+          const active = views.find((view) => view.classList.contains("active"));
+          printState = active ? active.id : "view-intro";
+          views.forEach((view) => view.classList.add("active"));
+          document.querySelectorAll("details:not([open])").forEach((details) => {
+            details.dataset.printOpen = "true";
+            details.open = true;
+          });
+        });
+        window.addEventListener("afterprint", () => {
+          document.querySelectorAll("details[data-print-open]").forEach((details) => {
+            details.open = false;
+            delete details.dataset.printOpen;
+          });
+          views.forEach((view) => {
+            view.classList.toggle("active", view.id === printState);
+          });
+          printState = null;
+        });
+
+        const initial = location.hash.slice(1);
+        show(
+          views.some((view) => view.id === initial) ? initial : "view-intro",
+        );
+      })();
+    </script>
+  </body>
 </html>
