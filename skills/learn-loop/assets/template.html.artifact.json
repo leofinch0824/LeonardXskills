@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "kind": "html",
+  "title": "skills/learn-loop/assets/template.html",
+  "entry": "skills/learn-loop/assets/template.html",
+  "renderer": "html",
+  "status": "complete",
+  "exports": [
+    "html",
+    "pdf",
+    "zip"
+  ],
+  "createdAt": "2026-08-04T05:28:21.843Z",
+  "updatedAt": "2026-08-04T05:28:21.843Z",
+  "metadata": {
+    "inferred": true,
+    "reconciled": true
+  }
+}

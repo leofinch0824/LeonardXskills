@@ -5,8 +5,9 @@ __pycache__/
 .pytest_cache
 
 # Local-only development and test content
-tests/
-learning/
+tests
+learning
+.od-skills
 .learn-loop
 .python-version
 # AGENTS.md

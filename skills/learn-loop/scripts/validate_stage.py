@@ -523,6 +523,26 @@ DOUBLE_ESCAPED = re.compile(r"&amp;#1(?:23|25);")
 # 未代入的中文槽位，转义前后两种写法都要抓
 PROMPT_SLOTS = ("主题", "角色", "水平", "目标")
 EXAM_STATUS_LINE = re.compile(r"交互施考(?:\s*[:：])?\s*(?:未进行|已完成\s*\d+\s*题)")
+NOSCRIPT_OPEN_TAG = re.compile(r"<noscript\b[^>]*>", re.IGNORECASE | re.DOTALL)
+STYLESHEET_TAG = re.compile(r"<link\b[^>]*>", re.IGNORECASE)
+SCRIPT_SOURCE_TAG = re.compile(
+    r"<script\b[^>]*\bsrc=[\"']([^\"']+)[\"'][^>]*></script>", re.IGNORECASE
+)
+ASSET_NAMES = {"template.css", "template.js"}
+RUN_ID_ATTR = re.compile(
+    r"<body\b[^>]*\bdata-run-id=[\"']([^\"']+)[\"'][^>]*>",
+    re.IGNORECASE | re.DOTALL,
+)
+VIEW_OPEN_TAG = re.compile(
+    r"<section\b[^>]*\bclass=[\"'][^\"']*\bview\b[^\"']*[\"'][^>]*>",
+    re.IGNORECASE,
+)
+WORKBENCH_OD_IDS = (
+    "learning-directory",
+    "learning-workbench",
+    "learning-map",
+    "chapter-context",
+)
 
 
 def check_html_learnability(text, name, violations):
@@ -562,6 +582,63 @@ def check_html_learnability(text, name, violations):
         )
 
 
+def check_html_assets(path, text, violations):
+    """模板采用外链固定资源时，二者必须是同目录的本地文件。"""
+    references = []
+    for tag in STYLESHEET_TAG.findall(text):
+        if re.search(r"\brel=[\"']stylesheet[\"']", tag, re.IGNORECASE):
+            match = re.search(r"\bhref=[\"']([^\"']+)[\"']", tag, re.IGNORECASE)
+            if match:
+                references.append(match.group(1))
+    references.extend(SCRIPT_SOURCE_TAG.findall(text))
+    if not references:
+        return
+    if set(references) != ASSET_NAMES or len(references) != len(ASSET_NAMES):
+        violations.append(f"HTML 固定资源引用必须各为一次 template.css 和 template.js：{path.name}")
+        return
+    for reference in references:
+        asset = Path(reference)
+        if asset.name != reference or not (path.parent / asset).is_file():
+            violations.append(f"HTML 固定资源必须位于同目录且可读取：{reference}（{path.name}）")
+
+
+def check_html_workbench_contract(text, name, violations):
+    """固定工作台模板必须携带稳定状态键和可检查的区域标识。"""
+    template_based = bool(
+        re.search(r"href=[\"']template\.css[\"']", text, re.IGNORECASE)
+        or 'data-learn-loop="template.css"' in text
+    )
+    if not template_based:
+        return
+
+    run_id = RUN_ID_ATTR.search(text)
+    if not run_id or not run_id.group(1).strip():
+        violations.append(f"HTML 工作台缺少非空 data-run-id：{name}")
+
+    od_ids = re.findall(r"\bdata-od-id=[\"']([^\"']+)[\"']", text)
+    duplicates = sorted({value for value in od_ids if od_ids.count(value) > 1})
+    if duplicates:
+        violations.append(
+            f"HTML 存在重复 data-od-id：{name}（{'、'.join(duplicates[:5])}）"
+        )
+    for required in WORKBENCH_OD_IDS:
+        if required not in od_ids:
+            violations.append(f"HTML 工作台缺少关键区域 data-od-id={required}：{name}")
+
+    for tag in VIEW_OPEN_TAG.findall(text):
+        view_id = re.search(r"\bid=[\"']([^\"']+)[\"']", tag)
+        if not re.search(r"\bdata-od-id=[\"'][^\"']+[\"']", tag):
+            label = view_id.group(1) if view_id else "未知视图"
+            violations.append(f"HTML 视图缺少 data-od-id：{name}（{label}）")
+        if not re.search(r"\bdata-module=[\"'][^\"']+[\"']", tag):
+            label = view_id.group(1) if view_id else "未知视图"
+            violations.append(f"HTML 视图缺少 data-module：{name}（{label}）")
+
+    for view_id, command in (("view-8", "考我"), ("view-9", "给我讲")):
+        if f'id="{view_id}"' in text and f'data-workflow-command="{command}"' not in text:
+            violations.append(f"HTML {view_id} 缺少对话交接命令“{command}”：{name}")
+
+
 def validate_html(run_dir):
     html_files = sorted(run_dir.glob("*.html"))
     if not html_files:
@@ -571,7 +648,7 @@ def validate_html(run_dir):
         text = path.read_text(encoding="utf-8")
         if "{{" in text or "}}" in text:
             violations.append(f"HTML 残留占位符：{path.name}")
-        if "<noscript>" not in text:
+        if not NOSCRIPT_OPEN_TAG.search(text):
             violations.append(
                 f"HTML 缺少 noscript 降级（JS 禁用时全部视图应可读）：{path.name}"
             )
@@ -579,6 +656,8 @@ def validate_html(run_dir):
             violations.append(
                 f"HTML 缺少施考状态行（须为“交互施考未进行”或“交互施考已完成 N 题”）：{path.name}"
             )
+        check_html_assets(path, text, violations)
+        check_html_workbench_contract(text, path.name, violations)
         check_html_learnability(text, path.name, violations)
     return violations
 

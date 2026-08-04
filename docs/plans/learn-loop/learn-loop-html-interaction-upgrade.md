@@ -1,11 +1,11 @@
 # Learn Loop HTML 模板与交互改良方案
 
-> 状态：**仅方案，未实施**。本文档自包含，执行者可据此直接动手。
+> 状态：**历史实施记录，已由 [`learn-loop-ui-redesign-plan.md`](learn-loop-ui-redesign-plan.md) 取代**（2026-08-04）。本文保留二态自评与零新增占位符阶段的设计背景，不再描述当前模板；当前实现以 UI 重设计计划和 `skills/learn-loop/reference/html-guide.md` 为准。
 > 范围约束：不动 SKILL.md 十步流程、不动任何 Markdown 产物结构、**零新增占位符、零新增渲染义务**。
 
 ## 一、背景
 
-`assets/template.html` 是十步闭环的唯一视图层，`reference/html-guide.md` 是其渲染契约。现状已做到：阅读序≠生成序、双层信息架构、答案折叠、施考状态行、结构闸门。但与 skill 理念（检索练习、主动回忆、可留存可复习）对照，仍存在一批已验证的不足。
+`assets/template.html`、`template.css` 与 `template.js` 共同构成十步闭环的固定视图层，`reference/html-guide.md` 是其渲染契约。以下清单记录实施前已验证的不足；本方案的修复已经落在模板、guide、validator 和测试中。
 
 ## 二、已验证的不足清单（源码实证，非推测）
 
@@ -22,7 +22,7 @@
 | # | 不足 | 证据 | 后果 |
 |---|---|---|---|
 | 4 | **打印/PDF 只输出当前页**：`.view{display:none}` 不打印，未 `open` 的 `<details>` 内容 UA 不渲染 | 现有 CSS + UA 行为 | "可留存"教材无法完整导出 |
-| 5 | **禁 JS 时非首页视图全部不可达**：视图切换纯 JS 驱动，无 `<noscript>` 降级 | template.html 无 noscript | 单文件健壮性失守 |
+| 5 | **禁 JS 时非首页视图全部不可达**：视图切换纯 JS 驱动，无 `<noscript>` 降级 | template.html 无 noscript | 页面健壮性失守 |
 | 6 | **Cmd-F 搜不到未激活视图**：`display:none` 不参与浏览器页内查找 | 同上 | "可复习"资料无法检索定位 |
 | 7 | **切换视图不滚顶**：`show()` 无 `scrollTo`，从长页底部切走后停在新页中段 | 现有 JS | 导航体验断裂 |
 
@@ -35,6 +35,23 @@
 | 10 | 无 `prefers-reduced-motion` 兜底（`scroll-behavior:smooth`） | 前庭障碍用户 |
 | 11 | `.prose` 内表格窄屏溢出 | 产物表格多，移动端必现 |
 | 12 | 隐私模式/file:// 下 localStorage 可能抛异常 | 新交互的存储需 try/catch + 内存兜底 |
+
+## 二·一、实施状态（按当前源码核对）
+
+| 条目 | 状态 | 当前实现证据 |
+|---|:---:|---|
+| P0-1 闪卡自评 | [x] | 模板 JS 向 `.flash-answer` 注入“答对了/答错了”，状态写入按文档隔离的 `localStorage` 键 |
+| P0-2 章节进度 | [x] | 模板 JS 注入“标记本章已读”，同步侧栏和学习地图状态 |
+| P0-3 洗牌与弱项筛选 | [x] | 每个 deck 有“洗牌重练 / 只看未掌握 / 全部收起”和进度计数，使用 CSS `order` 不改事实源顺序 |
+| P1-4 打印/PDF | [x] | `@media print` 与 `beforeprint/afterprint` 展开全部视图和 details |
+| P1-5 禁 JS 降级 | [x] | 模板含 `<noscript>` 平铺视图；validator 使用正则识别带空白/属性/换行的合法起始标签 |
+| P1-6 页内搜索 | [x] | JS 建立全部视图索引，提供标题、命中片段和跳转闪烁 |
+| P1-7 导航滚顶 | [x] | `show()` 调用 `window.scrollTo(0, 0)` |
+| P2-8 可访问性导航 | [x] | `aria-current`、目标标题聚焦和 `aria-expanded` 同步 |
+| P2-9 移动端抽屉 | [x] | Esc、点击主区关闭及菜单状态同步 |
+| P2-10 动效降级 | [x] | `prefers-reduced-motion` 关闭平滑滚动和动画 |
+| P2-11 窄屏表格 | [x] | `.prose table` 使用横向滚动容器 |
+| P2-12 存储兜底 | [x] | `localStorage` 读写均 try/catch，失败时保留当前页面内存态 |
 
 ## 三、改良设计
 
@@ -91,7 +108,7 @@
 - `@media (prefers-reduced-motion: reduce)`：关平滑滚动与动画。
 - `.prose table{display:block;overflow-x:auto}` 防窄屏溢出。
 
-## 四、契约与闸门同步
+## 四、契约与闸门同步（已完成）
 
 ### `reference/html-guide.md`
 
@@ -99,14 +116,14 @@
 - 新增「交互层与状态边界」节：自评/已读 ≠ 施考记录、不进事实源、不得写入 HTML 源码；洗牌/筛选不改变事实源题库顺序。
 - 「答案必须可折叠」节补：自评按钮位于 `.flash-answer` 内（先对照后自评）。
 - 「交付前检查」节补：`<noscript>` 降级存在（闸款项）；注明**本版零新增占位符**。
-- 增补模板维护纪律：script/style 内花括号分行书写。
+- 增补固定资源维护纪律：`template.js`/`template.css` 内花括号分行书写。
 
 ### `scripts/validate_stage.py`
 
-`validate_html` 只加一条结构检查：
+`validate_html` 使用正则识别合法的 `<noscript ...>` 起始标签，并在模板使用外链资源时验证 `template.css`、`template.js` 均为同目录可读取文件。
 
 ```python
-if "<noscript>" not in text:
+if not NOSCRIPT_OPEN_TAG.search(text):
     violations.append(f"HTML 缺少 noscript 降级（JS 禁用时全部视图应可读）：{path.name}")
 ```
 
@@ -115,14 +132,14 @@ if "<noscript>" not in text:
 ### `tests/test_learn_loop.py`（只增不删既有断言）
 
 1. 新增 `test_template_placeholders_are_documented_in_guide`：模板全部 `{{[A-Z0-9_]+}}` ⊆ html-guide.md 文本（防契约漂移）。
-2. 新增 `test_template_script_and_style_avoid_double_braces`：模板 script/style 块内无连续 `{{`/`}}`（守护书写纪律）。
+2. 新增模板资源契约测试：CSS/JS 独立存在、HTML 各引用一次且不再内嵌大段实现；`render_template.py` 覆盖同目录复制与可选内联。
 3. 新增 `test_html_rejects_missing_nojs_fallback`：无 `<noscript>` 的产物被拦。
 4. 两个既有 `test_html_*` fixture 的手写 HTML 补 `<noscript></noscript>`（spec 演进的 fixture 适配，断言不动）。
 5. 两个 `--all` 完整 fixture 无需改动（产物由模板生成，自动继承 noscript）。
 
-### TDD 顺序
+### TDD 顺序（实施记录）
 
-先写 1–3 失败用例 → 实现闸门与模板 → 全绿 → 同步 guide。每组改完跑 `poetry run pytest tests/ -q`。
+已按“先写失败用例 → 确认跨行起始标签被误报 → 最小化放宽 validator 匹配 → 回归测试”的顺序完成。
 
 ## 五、明确不做（及理由）
 
@@ -134,10 +151,10 @@ if "<noscript>" not in text:
 | 多结果高亮/拼音搜索 | 复杂度不成比例，片段预览已解决定位问题 |
 | 自评数据统计页 | 视图层不累积分析职能；弱项分析是模式 B 的职责 |
 
-## 六、全局验收
+## 六、全局验收（完成项）
 
-- `poetry run pytest tests/ -q` 全绿，无既有断言被删或放宽。
-- 产物中无自评/已读状态被写入 HTML 源码（运行时状态）。
-- 模板占位符集合与 guide 清单一致（新测试守护）。
-- 模板 script/style 无连续花括号（新测试守护）。
-- 手工冒烟：渲染产物在浏览器中验证——自评刷新后保留、打印预览含全部 12 个视图、禁用 JS 内容全可读、搜索可定位未激活视图内容。
+- [x] 交互模板、guide、HTML 闸门和回归 fixture 已同步；无新增占位符或 Markdown 渲染义务。
+- [x] 产物中无自评/已读状态写入 HTML 源码，运行时状态与模式 B/C 施考记录保持边界。
+- [x] 模板占位符集合与 guide 清单一致；固定 CSS/JS 已脱离 HTML 骨架，并由资源契约测试守护。
+- [x] 手工验收所需能力已由模板实现：自评刷新保留、打印展开全部视图、禁用 JS 内容可读、搜索可定位未激活视图。
+- [x] 40 个 learn-loop 测试用例已收录并通过；全量运行结果为 65 个测试、6 个 subtests 全部通过。

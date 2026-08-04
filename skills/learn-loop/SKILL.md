@@ -1,7 +1,7 @@
 ---
 name: learn-loop
 description: >-
-  中文优先的十步学习闭环：从开场学习画像、五个独立视角和来源分级，经过矛盾图谱、课程阶梯、核心练习，生成可校验的 Markdown 事实源与单文件 HTML 教材；再按用户主动触发的“考我”“给我讲/我来讲”执行可续考的检索练习和费曼复述。用户说“用十步学习法”“十倍速学 X”“learn-10x-faster”“系统学 X”“用 STORM 学 X”或要一套可留存、可复习的主题学习资料时使用。不要用于只问一个事实、只要某一步，或明确要 PPT/正式报告等其他交付物的请求。
+  中文优先的十步学习闭环：从开场学习画像、五个独立视角和来源分级，经过矛盾图谱、课程阶梯、核心练习，生成可校验的 Markdown 事实源与完整学习页面（HTML 与同目录固定资源）；再按用户主动触发的“考我”“给我讲/我来讲”执行可续考的检索练习和费曼复述。用户说“用十步学习法”“十倍速学 X”“learn-10x-faster”“系统学 X”“用 STORM 学 X”或要一套可留存、可复习的主题学习资料时使用。不要用于只问一个事实、只要某一步，或明确要 PPT/正式报告等其他交付物的请求。
 ---
 
 # Learn Loop
@@ -19,7 +19,7 @@ description: >-
    - 6a. 模式 A 只生成题库和讲解材料，不生成答题记录或复述记录（脚本可校验）。
    - 6b. 模式 B/C 不代答、不因用户未答推进游标；答题和复述必须逐字引用用户原话（脚本只能校验字段非空，不能证明是真原话）。
    - 6c. 「逐字引用用户原话」是信任型闸门：人工复核者必须是用户本人或另一名人类，不是执行本 skill 的模型。模型不得代为宣告通过，必须在交付时显式列出自己无法自证的项，交由用户确认。
-7. **把原文提示词当法条。** 每步执行指令必须取自 [`reference/original-prompts.md`](reference/original-prompts.md)，只填 `{{主题}}`、`{{角色}}`、`{{水平}}`、`{{目标}}`（`{{水平}}`/`{{目标}}` 由纪律层第 6/7 步消费，不进入原文法条正文），再追加对应纪律附录；不得改写、删减原文要求。
+7. **把原文提示词当法条。** 每步执行指令必须取自 [`reference/original-prompts.md`](reference/original-prompts.md)，只填 `{{主题}}`、`{{角色}}`、`{{水平}}`、`{{目标}}`（`{{水平}}`/`{{目标}}` 由纪律层第 6/7 步消费，不进入原文法条正文，再追加对应纪律附录；不得改写、删减原文要求。
 8. **只回灌用户确认的长期事实。** 开场学习画像默认不进 `learner-profile.md`（属本轮一次性场景）；仅当用户明确表示“记住这个”时才回灌，并引用原话和日期。`learner-profile.md` 不记录模型从分数推断的倾向；这类观察只留在本轮产物和复习队列。
 
 ## 前置判断：适用性判定
@@ -75,7 +75,15 @@ python3 <skill-root>/scripts/preflight.py --workspace-root <workspace-root> --bo
 | 9 | 12 岁版、3–5 个困惑点、简单准确完整的最终定义；不写复述记录 | [`examination.md`](reference/examination.md) |
 | 10 | 一句定义、短条目、3–5 例、易错易混、上场清单、3–7 道快问快答；渲染、索引和复习队列回灌 | [`retention.md`](reference/retention.md)、[`html-guide.md`](reference/html-guide.md) |
 
-第 8/9 步是备考/备教材料，不是实际练习。模式 A 完成后按 [`html-guide.md`](reference/html-guide.md) 将全部 Markdown 片段填入 [`assets/template.html`](assets/template.html) 副本，输出 `<run-dir>/<主题>-十步学习.html`。HTML 是视图，不得成为事实源；不得残留 `{{`。页面要显示施考状态行：未施考时为“交互施考未进行，对我说‘考我’即可开始”，用户练习后按 `08-exam-record.md` 的 `当前游标` 重渲染为“交互施考已完成 N 题”；并在 `<index-path>` 追加一行、用 `review_queue.py --add` 登记 1/7/30 天复习。
+第 8/9 步是备考/备教材料，不是实际练习。模式 A 完成后按 [`html-guide.md`](reference/html-guide.md) 将全部 Markdown 片段填入 [`assets/template.html`](assets/template.html) 副本，输出 `<run-dir>/<主题>-十步学习.html`，再执行：
+
+```bash
+python3 <skill-root>/scripts/render_template.py \
+  --input <run-dir>/<主题>-十步学习.html \
+  --output <run-dir>/<主题>-十步学习.html
+```
+
+该命令将固定的 `template.css` 和 `template.js` 复制到 HTML 同目录；需要单个可迁移 HTML 时才追加 `--inline`。HTML 是视图，不得成为事实源；不得残留 `{{`。页面要显示施考状态行：未施考时为“交互施考未进行，对我说‘考我’即可开始”，用户练习后按 `08-exam-record.md` 的 `当前游标` 重渲染为“交互施考已完成 N 题”；并在 `<index-path>` 追加一行、用 `review_queue.py --add` 登记 1/7/30 天复习。
 
 ## 模式 B：施考会话
 
@@ -103,7 +111,7 @@ python3 <skill-root>/scripts/validate_stage.py --run-dir <run-dir> --all --json
 
 脚本负责数量、必填章节、表格非空、上游文件存在、游标一致、HTML 占位符和回灌记录等结构检查；它不判断分歧是否实质、来源是否真的支持结论、评分推导是否合理或引用是否真为用户原话。交付前分两栏确认：
 
-- 脚本已验证：10 个阶段按序、来源等级结构完整、HTML 可打开且无外部依赖、模式 A 没有答题/复述记录、INDEX/queue 已追加。
+- 脚本已验证：10 个阶段按序、来源等级结构完整、HTML 可打开且仅使用同目录固定资源、模式 A 没有答题/复述记录、INDEX/queue 已追加。
 - 需用户确认（模型不得代为宣告通过）：分歧是否实质、来源是否真的支持结论、评分推导是否合理、逐字引用是否真为用户原话、profile 回灌是否经用户明确确认。
 
 ## 资源导航

@@ -1,0 +1,26 @@
+{
+  "kind": "critique-panel",
+  "score": 4.8,
+  "axes": {
+    "clarity": {
+      "score": 5,
+      "notes": "摘要标题与章内导航均按学习语义呈现，不再把正文细项误作导航。"
+    },
+    "hierarchy": {
+      "score": 5,
+      "notes": "五视角目录保持角色层级；表格现在也能清晰区分相邻的信息列。"
+    },
+    "typography": {
+      "score": 5,
+      "notes": "角色正文标题提升至 26–31px，并保留正文的稳定阅读行宽。"
+    },
+    "motion": {
+      "score": 4,
+      "notes": "视图进入、搜索定位、目录折叠和 reduced-motion 均已覆盖，动效保持克制。"
+    },
+    "brand": {
+      "score": 5,
+      "notes": "表格列线由既有边框色与辅助色混合得出，保持克制且统一。"
+    }
+  }
+}

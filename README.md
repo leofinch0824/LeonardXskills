@@ -90,7 +90,7 @@
 
 <a id="learn-loop"></a>
 
-`learn-loop` 是中文优先的十步学习闭环。它把五视角 STORM、来源等级、矛盾图谱、学习阶梯、主动回忆和费曼复述组织成一条可校验流水线：模式 A 生成 Markdown 事实源和单文件 HTML，用户之后说“考我”进入可续考的模式 B，说“给我讲/我来讲”进入真实的模式 C。用户说“十倍速学 X”或 `learn-10x-faster` 时也应触发它。
+`learn-loop` 是中文优先的十步学习闭环。它把五视角 STORM、来源等级、矛盾图谱、学习阶梯、主动回忆和费曼复述组织成一条可校验流水线：模式 A 生成 Markdown 事实源和完整学习页面（HTML 与同目录固定资源），用户之后说“考我”进入可续考的模式 B，说“给我讲/我来讲”进入真实的模式 C。用户说“十倍速学 X”或 `learn-10x-faster` 时也应触发它。
 
 ```text
 开场两问 → 5 个独立视角 → 冲突/共识 → 简报 → 评审
@@ -188,7 +188,7 @@ LeonardXskills/
 │   ├── reference/               # 法条提示词、纪律附录与 HTML 指南
 │   ├── scripts/                 # preflight、结构校验和复习队列 CLI
 │   ├── templates/               # 十步、练习记录和运行状态模板
-│   └── assets/template.html     # 无外部依赖的单文件学习视图
+│   └── assets/                  # 轻量 HTML 骨架及同目录 CSS/JS 固定资源
 ├── tests/test_paper_trail.py     # 包契约、CLI、安全边界与工作流测试
 ├── tests/test_learn_loop.py      # learn-loop 包契约与 CLI 测试
 ├── docs/                         # 设计说明与优化计划

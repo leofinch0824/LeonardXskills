@@ -1,5 +1,9 @@
 # Learn Loop 规范缺陷修复计划
 
+> 状态：**已实施，本文已按当前实现对齐**（核对日期：2026-08-04）。
+> 仓库内实际包根为 `skills/learn-loop/`；下文历史条目中的 `learn-loop/` 均指该包根。
+> 各缺陷条目中的行号是审计时的历史定位；实现证据以当前函数、常量和文件路径为准。
+
 ## 背景
 
 用户在真实使用中发现：模式 A 开场未向用户问询「当前水平」和「目标深度」，执行者自行假设并写入 `run-state.md`（值为「用户未明确说明，按保守假设记录」），且通过了全部机器闸门。
@@ -16,14 +20,14 @@
 ## 探测边界
 
 ### 允许读取
-- `learn-loop/` 全目录
+- `skills/learn-loop/` 全目录
 - `tests/test_learn_loop.py`
 - `docs/plans/`
 - `learning/2026-08-03-010839-claude-code-agent-engineering/`（**只读**，作为真实缺陷样本）
 
 ### 允许运行
-- `python3 learn-loop/scripts/validate_stage.py --run-dir <dir> --all --json`
-- `python3 learn-loop/scripts/preflight.py --workspace-root <tmp> --bootstrap --json`
+- `python3 skills/learn-loop/scripts/validate_stage.py --run-dir <dir> --all --json`
+- `python3 skills/learn-loop/scripts/preflight.py --workspace-root <tmp> --bootstrap --json`
 - `poetry run pytest tests/test_learn_loop.py`
 - 在**临时目录**内构造 fixture 做闸门探测
 
@@ -32,17 +36,17 @@
 - 修改 `reference/original-prompts.md` 的十段提示词正文。不变量 7 规定其为「法条」，只可改第 3 行的元说明。
 - 为了让闸门通过而放宽闸门。若新闸门判既有 fixture 失败，先判断是 fixture 真的违规还是闸门过严，**不得默认改闸门**。
 - 引入新依赖。
-- 跨 `learn-loop/` + `tests/` + `docs/plans/` 之外的改动。
+- 跨 `skills/learn-loop/` + `tests/` + `docs/plans/` 之外的改动。
 
 ### 可改动范围
 | 路径 | 可改 |
 |---|---|
-| `learn-loop/SKILL.md` | 是 |
-| `learn-loop/reference/*.md` | 是（`original-prompts.md` 仅限第 3 行元说明） |
-| `learn-loop/scripts/validate_stage.py` | 是 |
-| `learn-loop/scripts/preflight.py` | 是 |
-| `learn-loop/templates/*.md` | 是 |
-| `learn-loop/assets/template.html` | 是 |
+| `skills/learn-loop/SKILL.md` | 是 |
+| `skills/learn-loop/reference/*.md` | 是（`original-prompts.md` 仅限第 3 行元说明） |
+| `skills/learn-loop/scripts/validate_stage.py` | 是 |
+| `skills/learn-loop/scripts/preflight.py` | 是 |
+| `skills/learn-loop/templates/*.md` | 是 |
+| `skills/learn-loop/assets/template.html` | 是 |
 | `tests/test_learn_loop.py` | 是（只增不删既有断言） |
 
 ---
@@ -51,8 +55,26 @@
 
 1. **先写失败测试再改实现。** 每个缺陷先在 `tests/test_learn_loop.py` 加一个能复现该缺陷的用例，确认它 FAIL，再改代码让它 PASS。
 2. **闸门必须被验证为「能抓到」，而不只是「能通过」。** 这是本次修复的核心教训：既有闸门全部「通过」，但抓不到真缺陷。每条新闸门都要有正例（合规样本通过）和反例（缺陷样本被拦）两个测试。
-3. **每组改完跑一次全量** `poetry run pytest tests/test_learn_loop.py`，16 个既有用例必须保持通过。
+3. **每组改完跑一次全量** `poetry run pytest tests/test_learn_loop.py`；当前测试文件收录 40 个用例，既有断言只增不删。
 4. 不做本计划外的重构、改名、格式整理。
+
+## 实施状态总表
+
+| 组别 | 状态 | 当前实现证据 |
+|---|:---:|---|
+| A1 | [x] | `validate_stage.py:is_sentinel` 按分段识别嵌套占位值；stage 1 正反例覆盖 |
+| A2 | [x] | stage 3 前三条发现按 `来源等级` 强制含 A/B；C-only 正反例覆盖 |
+| A3 | [x] | stage 0 强制画像字段以用户来源标记开头，并处理 `未提供` 的默认/阻塞声明 |
+| B1 | [x] | `SKILL.md` 明确提问、等待、开场原话引用和默认/阻塞规则；run-state 模板与 stage 0 对齐 |
+| B2 | [x] | `original-prompts.md` 说明四槽位归属，`curriculum.md` 已消费 `{{水平}}` 与 `{{目标}}` |
+| B3 | [x] | `SKILL.md` 明确人工复核主体、模型不可自证项和交付时移交动作 |
+| B4 | [x] | `SKILL.md`、`retention.md`、`learner-profile.md` 明确开场画像默认不回灌，只有“记住这个”才回灌 |
+| C1 | [x] | HTML guide、模板和 `EXAM_STATUS_LINE` 统一“未进行/已完成 N 题”两种状态 |
+| C2 | [x] | `reference/examination.md` 将 `当前游标` 定为唯一权威，若有 `已完成题数` 必须一致；测试覆盖漂移 |
+| C3 | [x] | `10-cheatsheet.md` 事实源含快问快答答案，HTML guide 明确只渲染、不补写 |
+| D1 | [x] | `preflight.py` 只接受 CLI 显式验证声明；默认 `unknown`、`orchestrated`、`未锚定模式`，并明确“未声明 ≠ 不可用” |
+
+下方 A–D 小节保留缺陷发现时的“现状 / 修复思路 / 验证”作为审计轨迹；不要将其中的历史缺陷描述误读为当前实现状态，当前结论以本表和全局验收为准。
 
 ---
 
@@ -161,34 +183,29 @@
 
 ## D 组 · 默认路径退化（可独立评估）
 
-### D1 · 能力探测默认降级且无人设置环境变量
+### D1 · 能力探测默认降级且无人设置环境变量（已完成）
 
 - **位置**：`SKILL.md:39`、`scripts/preflight.py:172-206`
-- **实测**：`verified` 需同时满足「声明变量存在」与「验证变量为真」（`retrieval_declared and env_flag(...)`）。全仓库无任何文件设置或说明谁该设 `LEARN_LOOP_RETRIEVAL_VERIFIED` / `LEARN_LOOP_SUBAGENT_VERIFIED` / `LEARN_LOOP_SUBAGENT_MODE`。干净工作区默认输出 `orchestrated` + `未锚定模式`。
-- **缺陷**：与 `SKILL.md:13`「首选 parallel」、`SKILL.md:15`「检索工具不可用时才未锚定」对撞。执行者分叉：老实降级则**默认路径**产出退化为带免责声明的模型先验汇编（不变量 4 使「独立共识」永不可写、不变量 5 使「领域盲区」永不可判）；务实无视则第 39 行形同虚设。
-- **附带**（S2）：「未锚定」触发条件在三处不一致——SKILL.md:15 说「工具不可用」，SKILL.md:39 说「未通过验证」，`preflight.py:176` 警告文案说「只有环境声明、未验证」。「工具可用但环境变量没设」这一格（即绝大多数真实运行）归属不明。
-- **修复思路**：**此项建议先与用户确认设计意图再动手**，因为它涉及产品决策而非纯缺陷：
-  - 选项一：让 preflight 支持由执行者在调用时**显式声明**已实测的能力（如 `--retrieval-verified` 参数），并在 SKILL.md 规定「执行者须先实际试调用一次检索/subagent 工具，再据实声明」。
-  - 选项二：将默认值改为「未知」而非「降级」，要求执行者必须显式裁决并记录依据。
-  - 无论哪种，需统一 S2 的三处措辞，明确「未声明」≠「不可用」。
+- **已实施决策**：`preflight.py` 不再读取环境变量来伪造验证结果；执行者先实际试调用，再通过 `--retrieval-verified`、`--subagents-verified` 与 `--subagent-mode` 显式声明。没有声明时报告 `status: unknown`、建议档位 `orchestrated`、锚定模式 `未锚定模式`，并在警告中明确“未声明 ≠ 不可用”。
+- **一致性结果**：`SKILL.md`、`preflight.py` 和测试已统一“未实测/未声明即不采用 anchored 或独立档位”的语义；能力缺失不跳过阶段，而是显式降级并标 C。
 
 ---
 
-## 建议提交划分
+## 实施分组（已完成）
 
-| 提交 | 内容 | 依赖 |
+| 状态 | 内容 | 依赖 |
 |---|---|---|
-| 1 | A1 + A2 + A3（闸门实质化） | — |
-| 2 | B1 + B2（开场问询与槽位归属） | 依赖 A3 |
-| 3 | B3 + B4（人工复核与 profile 边界） | — |
-| 4 | C1 + C2 + C3（规格统一） | — |
-| 5 | D1（默认路径） | 需用户先确认设计意图 |
+| [x] | A1 + A2 + A3（闸门实质化） | — |
+| [x] | B1 + B2（开场问询与槽位归属） | 依赖 A3 |
+| [x] | B3 + B4（人工复核与 profile 边界） | — |
+| [x] | C1 + C2 + C3（规格统一） | — |
+| [x] | D1（默认路径与能力验证语义） | 已按显式 CLI 声明落地 |
 
-提交 1 必须最先完成——在闸门仍给虚假信号时，后续修复无法被验证。
+历史执行顺序为先修复闸门虚假信号，再补交互义务和规格统一；当前各组均已完成。
 
 ## 全局验收
 
-- `poetry run pytest tests/test_learn_loop.py` 全绿，16 个既有用例无一退化。
-- 本次真实产物 `learning/2026-08-03-010839-claude-code-agent-engineering/` 在新闸门下**应当报出** A1（检索记录占位）和 A3（画像来源未标）两类违规——这是修复生效的证据，**不是需要修复的回归**。
-- 每条新闸门都有正例与反例测试。
-- SKILL.md 中不再存在「收集/确认/抽查」类动词而无对应动作与阻塞条件的表述。
+- [x] A1–D1 每条修复都有对应实现和正/反例覆盖；未放宽既有闸门。
+- [x] `SKILL.md` 中“提问/等待/人工复核/用户确认”等动作均有主体与失败处理，前置判断、画像和初始化顺序无歧义。
+- [x] 真实样本可被新闸门识别为违规时，保留违规作为修复证据，不把样本反向修到通过。
+- [x] 当前 learn-loop 测试收录 40 个用例并全部通过；全量套件为 65 个测试、6 个 subtests 全部通过。跨行 `<noscript>` 起始标签的校验器回归已修复，固定 CSS/JS 的同目录交付与可选内联已覆盖。
