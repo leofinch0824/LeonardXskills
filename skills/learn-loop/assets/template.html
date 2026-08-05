@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{TOPIC}} · 十步学习闭环</title>
+    <title>{{TOPIC}} · {{TOPIC_SUB}} · 十步学习闭环</title>
     <link rel="stylesheet" href="template.css" />
     <noscript
       ><style>
@@ -113,7 +113,10 @@
       <div class="wrap" id="content">
         <section class="view active" id="view-intro" data-module="map" data-od-id="learning-map">
           <div class="kicker">一个可校验的学习闭环</div>
-          <h1 data-od-id="topic-title">{{TOPIC}}</h1>
+          <h1 data-od-id="topic-title">
+            {{TOPIC}}
+            <span class="h1-sub">{{TOPIC_SUB}}</span>
+          </h1>
           <p class="lead">{{METHOD_INTRO}}</p>
           <div class="card">
             <h3>十步地图</h3>
@@ -183,7 +186,7 @@
             <p class="step-purpose">{{STEP_9_PURPOSE}}</p>
           </div>
           <div class="status" data-workflow-command="给我讲">
-            交互费曼会话未进行，对我说“给我讲”或“我来讲”即可开始。
+            {{FEYNMAN_STATUS}}
           </div>
           <div class="takeaways">
             <div class="takeaways-title">本章要点速览</div>
@@ -202,7 +205,7 @@
             <h2 data-od-id="step-8-title">{{STEP_8_TITLE}}</h2>
             <p class="step-purpose">{{STEP_8_PURPOSE}}</p>
           </div>
-          <div class="status" data-workflow-command="考我">交互施考未进行，对我说“考我”即可开始。</div>
+          <div class="status" data-workflow-command="考我">{{EXAM_STATUS}}</div>
           <div class="takeaways">
             <div class="takeaways-title">本章要点速览</div>
             {{STEP_8_TAKEAWAYS}}

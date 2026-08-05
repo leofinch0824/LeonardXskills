@@ -2,7 +2,7 @@
 
 ## 事实源和模板
 
-复制 [`assets/template.html`](../assets/template.html)，渲染时只替换模板定义的 `{{...}}` 占位符，不改 CSS、侧栏结构或 JS。交互层（三态自评、进度、搜索、章内目录、连续学习导航、对话交接和打印）由 `assets/template.js` 在浏览器运行时注入，生成物源码不携带交互状态或标记。模板通过相对路径加载 `template.css` 与 `template.js`；填充完 HTML 后运行 `scripts/render_template.py`，默认将两个固定资源复制到 HTML 同目录。用户只需打开 HTML 即可获得完整页面，不依赖网络资源；仅在需要物理单文件时追加 `--inline`。
+由[`scripts/render_learning_page.py`](../scripts/render_learning_page.py)在全部 Markdown 阶段通过后读取事实源、静态构建[`assets/template.html`](../assets/template.html)，再调用`render_template.py`打包固定资源。不要让 agent 手工拼接占位符。交互层（三态自评、进度、搜索、章内目录、连续学习导航、对话交接和打印）由`assets/template.js`在浏览器运行时注入，生成物源码不携带用户表现。模板通过相对路径加载`template.css`与`template.js`；用户打开 HTML 不依赖网络，也不在浏览器 fetch Markdown。仅在需要物理单文件时使用`--inline`。
 
 `{{RUN_ID}}` 必须填为本轮运行目录的稳定 slug（例如 `2026-08-03-143052-python-asyncio`），不要使用页面标题。它只用于隔离浏览器本地阅读和自评状态，不写回 Markdown；标题修改后本机状态仍可延续。模板 JS 会尝试读取旧版标题键一次，兼容已有本地状态。
 
@@ -15,6 +15,23 @@
 每个 step section 的默认可见层只有：页面上的「这一页，先记住这些关键词」提示区、可视化（如有）、产物正文。提示词原文和「消费上游」一律放进章节末尾的 `<details class="panel evidence">`，**不加 `open`**，摘要固定为「取证 · 提示词与上游」。取证是溯源材料，不与教学内容争夺视觉权重。
 
 页面样式采用“证据驱动的学习工作台”：桌面宽屏显示全局目录、主阅读列和章内上下文栏；窄桌面自动收起第三栏。布局、断点和交互都在固定 CSS/JS 中，渲染者不生成第三栏内容。本版不要求渲染者为移动端准备另一份内容或结构，小屏只保留既有内容可达降级。
+
+## 总览主标题层级（必须）
+
+总览页的首标题必须保持“短主标题 + 小号副标题”的层级，不能把完整主题作为一段纯文本塞进 `<h1>`。固定模板已经提供结构：
+
+```html
+<h1 data-od-id="topic-title">
+  {{TOPIC}}
+  <span class="h1-sub">{{TOPIC_SUB}}</span>
+</h1>
+```
+
+- `{{TOPIC}}` 是开头的短主标题，通常保留 2–8 个字/词，使用展示字号突出主题核心。
+- `{{TOPIC_SUB}}` 是主题的范围、方法或场景补充，必须非空，使用 `.h1-sub` 的较小、低饱和样式。
+- 两个占位符分别做 HTML 转义；不要把 `<span>` 写进占位符内容，也不要用 `<br>` 或内联 `style` 模拟层级。
+- `<title>` 可以同时包含两个占位符，但页面语义上只能保留一个 `<h1>`；主标题和副标题不得重复同一段文字。
+- 生成后必须检查最终 HTML 同时存在 `data-od-id="topic-title"` 和 `.h1-sub`，不能只检查占位符已经被替换。
 
 章节标题由模板 kicker 显示步骤编号，因此 `{{STEP_N_TITLE}}` 优先填简洁主题，例如「五分钟速查表」，不要再次写「第 N 步：」。标题宜在桌面两行内；过长时保留准确含义，不用省略号裁切。
 
@@ -70,13 +87,15 @@
 | 占位符 | 内容 |
 |---|---|
 | `{{RUN_ID}}` | 稳定运行目录 slug；仅作为浏览器本地状态命名空间 |
-| `{{TOPIC}}` | 主题（HTML 转义） |
+| `{{TOPIC}}` | 总览页短主标题（HTML 转义） |
+| `{{TOPIC_SUB}}` | 总览页副标题/范围补充（HTML 转义，必须非空） |
+| `{{EXAM_STATUS}}` / `{{FEYNMAN_STATUS}}` | 从模式 B/C 记录文件存在性与会话状态静态推导；浏览器不读取 Markdown |
 | `{{METHOD_INTRO}}` | 方法和学习画像的总览段 |
 | `{{STEP_MAP}}` | 10 个步骤导航卡；数字已由 `.step-number` 显示，卡片标题不要重复「第 N 步」 |
 | `{{STEP_N_TITLE}}` / `{{STEP_N_PURPOSE}}` | 第 N 步标题与用途 |
 | `{{STEP_N_INPUT}}` | 已填原文提示词与消费上游标签（进取证折叠） |
 | `{{STEP_N_OUTPUT}}` | 完整原始产物片段，**剥去「本步提炼」小节** |
-| `{{STEP_N_TAKEAWAYS}}` | Markdown「本步提炼」中的 3–5 条结论；在页面「本章要点速览」提示区唯一呈现 |
+| `{{STEP_N_TAKEAWAYS}}` | Markdown「本步提炼」中的恰好 3 条结论；在页面「本章要点速览」提示区唯一呈现 |
 | `{{STEP_N_VIZ}}` | 语义可视化；无内容时留空，CSS 自动隐藏空槽 |
 | `{{STEP_8_CARDS}}` | 10 道题的 `.flash` 卡片（替代第 8 步 OUTPUT 正文） |
 | `{{STEP_10_QUIZ}}` | 快问快答的 `.flash` 卡片（题目与答案均取自 `10-cheatsheet.md` 事实源） |

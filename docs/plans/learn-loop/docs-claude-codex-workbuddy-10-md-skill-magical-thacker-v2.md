@@ -41,7 +41,7 @@
 
 实现状态以当前文件为准；本计划不再把已落地条目标成“待实施”。模式 B/C 的会话动作由执行 skill 的 agent 按协议执行，不是额外的独立 Python 服务。
 
-README 的相对链接、复制命令和快速开始命令按安装后的 skill 包根书写；从本仓库 checkout 直接运行时，应使用 `skills/learn-loop/` 前缀。该路径差异已在本计划记录，本次不改 README 或实现代码。
+README 的相对链接、复制命令和快速开始命令按安装后的 skill 包根书写；从本仓库 checkout 直接运行时，应使用 `skills/learn-loop/` 前缀。该路径差异曾在本计划记录；2026-08-05 的知识收尾已将 README 的仓库内链接与命令统一改为 `skills/...`，安装后的包根用法仍保持不变。
 
 > 验证注记（本工作树，2026-08-04）：`poetry run pytest tests/test_learn_loop.py -q` 为 40 个通过，`poetry run pytest tests/ -q` 为 65 个通过、6 个 subtests 通过。新增回归测试覆盖跨行 `<noscript>` 起始标签，以及固定 CSS/JS 的同目录交付和可选内联。
 

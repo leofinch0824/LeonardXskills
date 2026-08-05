@@ -86,6 +86,31 @@ def append_row(path, cells):
 
 def add_review(path, topic, slug, run_day):
     dates = [run_day + timedelta(days=offset) for offset in (1, 7, 30)]
+    lines, rows = load_rows(path)
+    if rows:
+        header_index = next(
+            index for index, line in enumerate(lines) if "| slug |" in line
+        )
+        indices = find_column_indices(split_row(lines[header_index]))
+        matches = [
+            row for row in rows if row["cells"][indices["slug"]] == slug
+        ]
+        if matches:
+            expected = (run_day.isoformat(), topic)
+            actual = (
+                matches[0]["cells"][indices["日期"]],
+                matches[0]["cells"][indices["主题"]],
+            )
+            if len(matches) == 1 and actual == expected:
+                return {
+                    "topic": topic,
+                    "slug": slug,
+                    "one_day": dates[0].isoformat(),
+                    "seven_day": dates[1].isoformat(),
+                    "thirty_day": dates[2].isoformat(),
+                    "updated": False,
+                }
+            raise ValueError(f"复习队列中同一运行 ID 存在冲突记录：{slug}")
     append_row(
         path,
         [
@@ -104,6 +129,7 @@ def add_review(path, topic, slug, run_day):
         "one_day": dates[0].isoformat(),
         "seven_day": dates[1].isoformat(),
         "thirty_day": dates[2].isoformat(),
+        "updated": True,
     }
 
 

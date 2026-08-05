@@ -82,7 +82,7 @@
 
 **不适用**：只查一个已知事实；只需要几篇论文标题；不需要证据链的一次性头脑风暴。
 
-详细流程见 [`paper-trail/SKILL.md`](./paper-trail/SKILL.md)，后端和降级策略见 [`reference/backends.md`](./paper-trail/reference/backends.md)。
+详细流程见 [`skills/paper-trail/SKILL.md`](./skills/paper-trail/SKILL.md)，后端和降级策略见 [`skills/paper-trail/reference/backends.md`](./skills/paper-trail/reference/backends.md)。
 
 ---
 
@@ -98,12 +98,14 @@
 ```
 
 ```bash
-python3 learn-loop/scripts/preflight.py \
+poetry run python skills/learn-loop/scripts/preflight.py \
   --workspace-root /absolute/path/to/test-workspace \
   --bootstrap --json
 ```
 
-详细规则见 [`learn-loop/SKILL.md`](./learn-loop/SKILL.md)。运行产物默认写入目标工作区的 `.learn-loop/` 与 `learning/`；skill 包本身保持只读。`ten-step-learning/` 仍作为早期一次性 HTML 实现保留，`learn-loop` 是带校验与真实练习入口的版本。
+详细规则见 [`skills/learn-loop/SKILL.md`](./skills/learn-loop/SKILL.md)。运行产物默认写入目标工作区的 `.learn-loop/` 与 `learning/`；skill 包本身保持只读。`docs/reference/ten-step-learning/` 仍作为早期一次性 HTML 实现保留，`learn-loop` 是带校验与真实练习入口的版本。
+
+Learn Loop 的阶段契约、实现计划和当前评估见 [`docs/plans/learn-loop/learn-loop-format-contract-gap-analysis.md`](./docs/plans/learn-loop/learn-loop-format-contract-gap-analysis.md)、[`docs/plans/learn-loop/learn-loop-format-contract-remediation-plan.md`](./docs/plans/learn-loop/learn-loop-format-contract-remediation-plan.md) 和 [`docs/plans/learn-loop/learn-loop-format-contract-eval-results.md`](./docs/plans/learn-loop/learn-loop-format-contract-eval-results.md)。
 
 ---
 
@@ -116,19 +118,19 @@ python3 learn-loop/scripts/preflight.py \
 ```bash
 git clone https://github.com/leofinch0824/LeonardXskills.git
 mkdir -p ~/.codex/skills
-cp -R LeonardXskills/paper-trail ~/.codex/skills/
-cp -R LeonardXskills/learn-loop ~/.codex/skills/
+cp -R LeonardXskills/skills/paper-trail ~/.codex/skills/
+cp -R LeonardXskills/skills/learn-loop ~/.codex/skills/
 ```
 
 重新打开 Codex 会话后，通过 `$paper-trail` 或 `$learn-loop` 显式调用。
 
 **方式二 · 在仓库中直接使用**
 
-让 Agent 读取当前仓库的 `paper-trail/SKILL.md`，并明确要求按照该流程执行。此方式适合开发、调试和修改 skill。
+让 Agent 读取当前仓库的 `skills/paper-trail/SKILL.md`，并明确要求按照该流程执行。此方式适合开发、调试和修改 skill。
 
 > `paper-trail` 默认保持 skill 包只读；Profile 写入目标工作区的 `.paper-trail/`，调研产物写入目标工作区的 `research/`。
 
-对学习任务，让 Agent 读取 `learn-loop/SKILL.md`；它会把运行状态写入目标工作区的 `.learn-loop/`，把 Markdown 事实源与 HTML 视图写入 `learning/`。
+对学习任务，让 Agent 读取 `skills/learn-loop/SKILL.md`；它会把运行状态写入目标工作区的 `.learn-loop/`，把 Markdown 事实源与 HTML 视图写入 `learning/`。
 
 ---
 
@@ -139,13 +141,14 @@ cp -R LeonardXskills/learn-loop ~/.codex/skills/
 ### 1. 运行自动化测试
 
 ```bash
-python3 -m unittest discover -s tests -v
+poetry install
+poetry run python -m unittest discover -s tests -v
 ```
 
 ### 2. 初始化测试工作区
 
 ```bash
-python3 paper-trail/scripts/preflight.py \
+poetry run python skills/paper-trail/scripts/preflight.py \
   --workspace-root /absolute/path/to/test-workspace \
   --bootstrap \
   --json
@@ -174,7 +177,7 @@ Preflight 首次运行会创建 `.paper-trail/profile.md`。只需补齐本轮�
 
 ```text
 LeonardXskills/
-├── paper-trail/
+├── skills/paper-trail/
 │   ├── SKILL.md                 # 主流程、不变量与阶段闸门
 │   ├── agents/openai.yaml       # Codex 展示与调用元数据
 │   ├── reference/               # Reframe、后端、分层、抽取、综合与验证协议
@@ -183,7 +186,7 @@ LeonardXskills/
 │   │   ├── worker_boundary.py   # Worker 端点与数据边界分类
 │   │   └── extract_paper.py     # OpenAI-compatible 结构化抽取 Worker
 │   └── templates/               # 每轮调研的标准化 Markdown 产物
-├── learn-loop/
+├── skills/learn-loop/
 │   ├── SKILL.md                 # 十步流程、不变量、模式 A/B/C 与闸门
 │   ├── reference/               # 法条提示词、纪律附录与 HTML 指南
 │   ├── scripts/                 # preflight、结构校验和复习队列 CLI
@@ -198,9 +201,9 @@ LeonardXskills/
 新增或修改 skill 后，至少运行：
 
 ```bash
-python3 -m unittest discover -s tests -v
-python3 -m py_compile paper-trail/scripts/*.py
-python3 -m py_compile learn-loop/scripts/*.py
+poetry run python -m unittest discover -s tests -v
+poetry run python -m py_compile skills/paper-trail/scripts/*.py
+poetry run python -m py_compile skills/learn-loop/scripts/*.py
 ```
 
 ---
