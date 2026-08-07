@@ -80,7 +80,12 @@ def _linkify_source_urls(text: str) -> str:
 
 def render_markdown(text: str) -> str:
     """Render deterministic CommonMark with raw HTML disabled."""
-    return MARKDOWN.render(_linkify_source_urls(text))
+    html = MARKDOWN.render(_linkify_source_urls(text))
+
+    def wrap_table(match: re.Match) -> str:
+        return f'<div class="table-wrap">{match.group(0)}</div>'
+
+    return re.sub(r"<table>.*?</table>", wrap_table, html, flags=re.S)
 
 
 def _document(run_dir: Path, stage: int) -> MarkdownDocument:
@@ -255,14 +260,12 @@ def _quiz_cards(document: MarkdownDocument) -> str:
 
 def _visualization(stage: int, document: MarkdownDocument) -> str:
     if stage == 1:
-        cards = []
-        for role in ROLES:
-            section = _section(document, role, 3)
-            cards.append(
-                f'<a class="persona" href="#persona-{role}" '
-                f'data-od-id="persona-card-{role}"><strong>{role}</strong>'
-                f"<span>{html.escape(section.fields['核心立场'])}</span></a>"
-            )
+        cards = [
+            f'<a class="persona" href="#persona-{role}" '
+            f'data-od-id="persona-card-{role}">'
+            f'<span class="persona__role">{role}</span></a>'
+            for role in ROLES
+        ]
         return '<div class="persona-grid">' + "".join(cards) + "</div>"
     if stage == 6:
         levels = validate_stage._records(document, 3, "级别")

@@ -708,12 +708,12 @@ code {
   font-size: 0.8em;
 }
 
-.prose table,
-.prose .table-wrap {
+.table-wrap,
+.prose table {
   max-width: 100%;
 }
 
-.prose .table-wrap {
+.table-wrap {
   margin: 18px 0 28px;
   overflow-x: auto;
   border: 1px solid var(--border);
@@ -721,14 +721,14 @@ code {
   background: var(--surface);
 }
 
-.prose .table-wrap table,
+.table-wrap table,
 .prose table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.prose .table-wrap th,
-.prose .table-wrap td,
+.table-wrap th,
+.table-wrap td,
 .prose th,
 .prose td {
   min-width: 132px;
@@ -739,14 +739,15 @@ code {
   overflow-wrap: anywhere;
 }
 
-.prose .table-wrap th,
+.table-wrap th,
 .prose th {
   background: var(--soft);
   color: var(--nav-active);
-  font-size: 13px;
   font-weight: 750;
 }
 
+.table-wrap th + th,
+.table-wrap td + td,
 .prose th + th,
 .prose td + td {
   border-inline-start: 1px solid color-mix(in oklch, var(--border) 76%, var(--muted));
