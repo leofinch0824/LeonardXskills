@@ -108,6 +108,24 @@ def _role_guidance(role: str) -> str:
     )
 
 
+def _retrieval_requirements() -> str:
+    """读取 perspectives.md「检索操作要求」章节；未定义时返回空字符串。"""
+    discipline = (SKILL_ROOT / "reference" / "perspectives.md").read_text(
+        encoding="utf-8"
+    )
+    match = re.search(r"(?ms)^## 检索操作要求\s*\n(.*?)(?=^## |\Z)", discipline)
+    if match is None:
+        return ""
+    return match.group(1).strip()
+
+
+def _persona_guidance(role: str, requirements: str) -> str:
+    guidance = _role_guidance(role)
+    if requirements:
+        guidance += "\n\n**检索操作要求：**\n" + requirements
+    return guidance
+
+
 def _grading_rules() -> str:
     return (
         "- `A`：有可解析 URL，且来源直接支持对应主张。\n"
@@ -301,6 +319,7 @@ def build_role_packets(run_dir: Path, state: dict[str, str]) -> list[Path]:
         encoding="utf-8"
     )
     packets = []
+    requirements = _retrieval_requirements()
     for role, filename in ROLE_FILES.items():
         output_relative = f"perspectives/{filename}"
         output_path = run_dir / output_relative
@@ -316,7 +335,7 @@ def build_role_packets(run_dir: Path, state: dict[str, str]) -> list[Path]:
                 "TOPIC": state.get("主题", ""),
                 "ANCHORING_MODE": state.get("锚定模式", ""),
                 "INDEPENDENCE_TIER": state.get("独立性档位", ""),
-                "PERSONA_GUIDANCE": _role_guidance(role),
+                "PERSONA_GUIDANCE": _persona_guidance(role, requirements),
                 "ORIGINAL_PROMPT": extract_role_prompt(stage_excerpt, role).rstrip(),
                 "GRADING_RULES": _grading_rules(),
                 "ROLE_TEMPLATE": output_text.rstrip(),
