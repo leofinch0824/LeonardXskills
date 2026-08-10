@@ -95,7 +95,7 @@ def parse_args():
     parser.add_argument(
         "--retrieval-verified",
         action="store_true",
-        help="声明已实际试调用一次检索工具并成功（先实测，再声明）",
+        help="声明已实际试调用一次检索工具并成功读取至少一个候选正文（先实测，再声明）",
     )
     parser.add_argument(
         "--subagents-verified",
@@ -202,8 +202,8 @@ def inspect_capabilities(args, warnings):
     retrieval_verified = args.retrieval_verified
     if not retrieval_verified:
         warnings.append(
-            "检索能力未声明已验证；未声明 ≠ 不可用。请先实际试调用一次检索工具，"
-            "再以 --retrieval-verified 据实声明；未实测前按未锚定模式处理并将来源标 C"
+            "检索能力未声明已验证；未声明 ≠ 不可用。请先实际试调用一次检索工具并成功读取"
+            "至少一个候选正文，再以 --retrieval-verified 据实声明；未实测前按未锚定模式处理并将来源标 C"
         )
 
     declared_mode = args.subagent_mode or "orchestrated"

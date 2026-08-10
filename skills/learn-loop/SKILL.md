@@ -40,7 +40,7 @@ description: >-
 - `<learning-root>`：默认`<workspace-root>/learning`。
 - `<run-dir>`：`<learning-root>/<YYYY-MM-DD>-<HHMMSS>-<topic-slug>`；若存在则追加`-02`等，不覆盖。
 
-实际成功检索后才传`--retrieval-verified`；实际成功创建隔离 subagent 后才传`--subagents-verified`。执行：
+实际成功检索、且至少一个候选的正文实际读取成功后才传`--retrieval-verified`；实际成功创建隔离 subagent 后才传`--subagents-verified`。执行：
 
 ```bash
 python3 <skill-root>/scripts/preflight.py \
