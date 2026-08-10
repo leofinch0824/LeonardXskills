@@ -11,7 +11,6 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 
@@ -23,7 +22,14 @@ if str(SCRIPT_ROOT) not in sys.path:
 
 import render_template
 import validate_stage
-from contract_io import MarkdownDocument, Section, parse_document, parse_upstream_table, resolve_reference
+from contract_io import (
+    MarkdownDocument,
+    Section,
+    canonical_http_url,
+    parse_document,
+    parse_upstream_table,
+    resolve_reference,
+)
 from prepare_stage import extract_original_prompt
 
 
@@ -63,24 +69,29 @@ MARKDOWN = MarkdownIt(
 ).enable("table")
 
 
-def _linkify_source_urls(text: str) -> str:
-    expression = re.compile(
-        r"(?m)(- \*\*来源 URL：\*\*\s*)(https?://[^\s。]+)(。?)$"
-    )
+def _linkify_source_urls(text: str, *, strict: bool = False) -> str:
+    expression = re.compile(r"(?m)(- \*\*来源 URL[：:]\*\*\s*)(\S.*?)\s*$")
 
     def replacement(match: re.Match) -> str:
-        url = match.group(2)
-        parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError(f"拒绝渲染不安全来源 URL：{url}")
-        return f"{match.group(1)}[{url}]({url}){match.group(3)}"
+        value = match.group(2).strip()
+        if value == "无":
+            return match.group(1) + value
+        url = canonical_http_url(value)
+        if url is None:
+            if strict:
+                raise ValueError(f"来源 URL 必须是单一裸 HTTP(S) URL：{value}")
+            return match.group(0)
+        suffix = "。" if value.endswith("。") else ""
+        return f"{match.group(1)}[{url}]({url}){suffix}"
 
     return expression.sub(replacement, text)
 
 
-def render_markdown(text: str) -> str:
+def render_markdown(text: str, *, strict_source_urls: bool = False) -> str:
     """Render deterministic CommonMark with raw HTML disabled."""
-    html = MARKDOWN.render(_linkify_source_urls(text))
+    html = MARKDOWN.render(
+        _linkify_source_urls(text, strict=strict_source_urls)
+    )
 
     def wrap_table(match: re.Match) -> str:
         return f'<div class="table-wrap">{match.group(0)}</div>'
@@ -160,17 +171,18 @@ def _role_details(run_dir: Path) -> str:
         document = parse_document((run_dir / relative).read_text(encoding="utf-8"))
         start = _section(document, "核心立场", 2).start_line - 1
         detail_markdown = "\n".join(document.text.splitlines()[start:])
+        detail_html = render_markdown(detail_markdown, strict_source_urls=True)
         fragments.append(
             '<details class="panel role-detail">'
             f"<summary>{html.escape(role)}完整取证</summary>"
-            f'<div class="panel-body">{render_markdown(detail_markdown)}</div>'
+            f'<div class="panel-body">{detail_html}</div>'
             "</details>"
         )
     return "".join(fragments)
 
 
 def _perspective_output(run_dir: Path, document: MarkdownDocument) -> str:
-    output = render_markdown(_output_body(document, 1))
+    output = render_markdown(_output_body(document, 1), strict_source_urls=True)
     for role in ROLES:
         output = output.replace(
             f"<h3>{role}</h3>",

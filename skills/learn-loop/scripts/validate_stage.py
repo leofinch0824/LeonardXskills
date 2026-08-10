@@ -22,6 +22,7 @@ from contract_io import (
     ContractViolation,
     MarkdownDocument,
     Section,
+    canonical_http_url,
     exact_sections,
     is_sentinel,
     normalize_value,
@@ -359,12 +360,16 @@ def _check_grade_and_url(
     *,
     grade_field: str = "来源等级",
     url_field: str = "来源 URL",
+    require_single_url: bool = False,
 ) -> None:
     grade = normalize_value(section.fields.get(grade_field, "")).strip("。")
     url = normalize_value(section.fields.get(url_field, "")).strip("。")
+    valid_url = (
+        canonical_http_url(url) is not None if require_single_url else _valid_url(url)
+    )
     if grade not in GRADE_VALUES:
         _check_enum(section, grade_field, GRADE_VALUES, file, violations)
-    elif grade in {"A", "B"} and not _valid_url(url):
+    elif grade in {"A", "B"} and not valid_url:
         _add(
             violations,
             file,
@@ -372,7 +377,9 @@ def _check_grade_and_url(
             f"{section.title}的 {grade} 级来源必须有可解析 URL",
             record=section.title,
             field=url_field,
-            expected="http(s) URL",
+            expected=(
+                "单一裸 http(s) URL" if require_single_url else "http(s) URL"
+            ),
             actual=url,
         )
     elif grade == "C" and url != "无":
@@ -982,7 +989,9 @@ def _validate_role_file(
     if evidence is not None:
         fields = ("证据主张", "来源 URL", "来源等级", "支持说明", "未锚定原因")
         _check_fields(evidence, relative, fields, violations)
-        _check_grade_and_url(evidence, relative, violations)
+        _check_grade_and_url(
+            evidence, relative, violations, require_single_url=True
+        )
         grade = normalize_value(evidence.fields.get("来源等级", "")).strip("。")
         reason = normalize_value(evidence.fields.get("未锚定原因", "")).strip("。")
         if grade in {"A", "B"} and not reason.startswith("不适用："):
@@ -1045,7 +1054,7 @@ def _validate_role_file(
         )
         status = normalize_value(record.fields.get("结果状态", "")).strip("。")
         url = normalize_value(record.fields.get("来源 URL", "")).strip("。")
-        if status in {"采信", "未采信"} and not _valid_url(url):
+        if status in {"采信", "未采信"} and canonical_http_url(url) is None:
             _add(
                 violations,
                 relative,
@@ -1053,7 +1062,7 @@ def _validate_role_file(
                 f"{record.title}状态为{status}时必须有可解析 URL",
                 record=record.title,
                 field="来源 URL",
-                expected="http(s) URL",
+                expected="单一裸 http(s) URL",
                 actual=url,
             )
         if status in {"未命中", "检索不可用"} and url != "无":
@@ -2259,6 +2268,28 @@ def validate_html(run_dir: Path) -> list[ContractViolation]:
         name = path.name
         if "{{" in text or "}}" in text:
             violations.append(_html_violation(name, f"HTML 残留占位符：{name}"))
+        perspective_views = re.findall(
+            r"<section\b"
+            r"(?=[^>]*\bdata-module=[\"']perspectives[\"'])"
+            r"[^>]*>.*?</section>",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        for view in perspective_views:
+            source_items = re.findall(
+                r"<li\b[^>]*>\s*<strong>来源 URL：</strong>(.*?)</li>",
+                view,
+                re.IGNORECASE | re.DOTALL,
+            )
+            for item in source_items:
+                if re.search(r"https?://", item, re.IGNORECASE) and not re.search(
+                    r"<a\b[^>]*\bhref=[\"']https?://",
+                    item,
+                    re.IGNORECASE | re.DOTALL,
+                ):
+                    violations.append(
+                        _html_violation(name, f"HTML 来源 URL 未渲染为链接：{name}")
+                    )
         if not re.search(r"<noscript\b[^>]*>", text, re.IGNORECASE | re.DOTALL):
             violations.append(_html_violation(name, f"HTML 缺少 noscript 降级：{name}"))
         if not re.search(r"交互施考(?:\s*[:：])?\s*(?:未进行|已完成\s*\d+\s*题)", text):

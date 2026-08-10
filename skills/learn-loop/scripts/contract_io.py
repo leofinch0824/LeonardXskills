@@ -8,6 +8,7 @@ import re
 import tempfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 HEADING = re.compile(r"^(?P<marks>#{1,6})\s+(?P<title>\S.*?)\s*$")
@@ -29,6 +30,7 @@ SENTINEL_TERMS = (
     "待在发",
     "已填示例",
 )
+SOURCE_URL_PROSE_MARKS = frozenset("：；，、（）【】《》“”‘’")
 
 
 @dataclass(frozen=True)
@@ -175,6 +177,27 @@ def parse_upstream_table(document: MarkdownDocument) -> tuple[str, ...]:
 
 def normalize_value(value: str) -> str:
     return "\n".join(line.strip() for line in value.strip().splitlines()).strip()
+
+
+def canonical_http_url(value: str) -> str | None:
+    """Return one bare HTTP(S) URL, excluding prose and compound values."""
+    candidate = value.strip()
+    if candidate.endswith("。"):
+        candidate = candidate[:-1].rstrip()
+    if (
+        not candidate
+        or any(character.isspace() for character in candidate)
+        or any(mark in candidate for mark in SOURCE_URL_PROSE_MARKS)
+    ):
+        return None
+    try:
+        parsed = urlparse(candidate)
+        hostname = parsed.hostname
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not hostname:
+        return None
+    return candidate
 
 
 def is_sentinel(value: str) -> bool:
