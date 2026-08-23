@@ -16,7 +16,7 @@ description: >-
 4. 第 1 步的五个角色各自只读自己的任务包、只写自己的 `perspectives/*.md`。父 agent 等五份角色文件分别通过校验后，才写 `01-perspectives.md`；核心字段逐字抽取，完整分析留在角色文件。
 5. 来源等级固定为：`A` = 可解析 URL 直接支持主张；`B` = 有 URL 但间接、转述或只支持一部分；`C` = 模型先验或未验证。未实测检索能力时进入`未锚定模式`，不得凭记忆补 URL。
    步骤 2 只有不同来源且至少一条 A/B 的共同结论可标`独立共识`；全 C 只能标`模型先验·待验证`。五份检索完整后才可把候选遗漏标为`领域盲区`，否则标`未覆盖`。
-6. 步骤 1–10 的`本步提炼`恰好三条：核心结论、证据/边界/风险、对下一步的影响。普通字段使用`- **字段：** 值`；跨文件引用使用``相对路径#精确标题``。
+6. 步骤 1–10 的`本步提炼`恰好三条：核心结论、证据/边界/风险、对下一步的影响。普通字段使用`- **字段：** 值`；跨文件引用使用`相对路径#精确标题`。
 7. 模式 A 不创建真实回答、得分、逐字复述、考试游标或费曼轮次。模式 B/C 不代答；用户没回答就不增加完成记录和游标。
 8. `run-state.md`只保存运行、画像、能力、模式 A 进度和实际披露记录。考试事实只在`08-exam-record.md`，费曼事实只在`09-feynman-record.md`。
 9. HTML 是 Markdown 的静态渲染视图，不在浏览器读取 Markdown，不补写事实。长期画像只在用户明确授权且提供确认原话时更新。
@@ -117,19 +117,19 @@ python3 <skill-root>/scripts/validate_stage.py --run-dir <run-dir> --stage <7|8>
 
 只在准备对应步骤后读取相应文件：
 
-| 步骤 | 最终契约 | 内容判断补充 |
-|---|---|---|
-| 0 | [`00-run-state.md`](reference/stages/00-run-state.md) | [`pre-check.md`](reference/pre-check.md) |
-| 1 | [`01-perspectives.md`](reference/stages/01-perspectives.md) | [`perspectives.md`](reference/perspectives.md) |
-| 2 | [`02-conflicts.md`](reference/stages/02-conflicts.md) | [`conflict.md`](reference/conflict.md) |
-| 3 | [`03-brief.md`](reference/stages/03-brief.md) | [`conflict.md`](reference/conflict.md) |
-| 4 | [`04-review.md`](reference/stages/04-review.md) | [`conflict.md`](reference/conflict.md) |
-| 5 | [`05-resources.md`](reference/stages/05-resources.md) | [`curriculum.md`](reference/curriculum.md) |
-| 6 | [`06-ladder.md`](reference/stages/06-ladder.md) | [`curriculum.md`](reference/curriculum.md) |
-| 7 | [`07-sprint.md`](reference/stages/07-sprint.md) | [`curriculum.md`](reference/curriculum.md) |
-| 8 | [`08-exam-bank.md`](reference/stages/08-exam-bank.md) | [`examination.md`](reference/examination.md) |
-| 9 | [`09-feynman-notes.md`](reference/stages/09-feynman-notes.md) | [`examination.md`](reference/examination.md) |
-| 10 | [`10-cheatsheet.md`](reference/stages/10-cheatsheet.md) | [`retention.md`](reference/retention.md) |
+| 步骤 | 最终契约                                                      | 内容判断补充                                   |
+| ---- | ------------------------------------------------------------- | ---------------------------------------------- |
+| 0    | [`00-run-state.md`](reference/stages/00-run-state.md)         | [`pre-check.md`](reference/pre-check.md)       |
+| 1    | [`01-perspectives.md`](reference/stages/01-perspectives.md)   | [`perspectives.md`](reference/perspectives.md) |
+| 2    | [`02-conflicts.md`](reference/stages/02-conflicts.md)         | [`conflict.md`](reference/conflict.md)         |
+| 3    | [`03-brief.md`](reference/stages/03-brief.md)                 | [`conflict.md`](reference/conflict.md)         |
+| 4    | [`04-review.md`](reference/stages/04-review.md)               | [`conflict.md`](reference/conflict.md)         |
+| 5    | [`05-resources.md`](reference/stages/05-resources.md)         | [`curriculum.md`](reference/curriculum.md)     |
+| 6    | [`06-ladder.md`](reference/stages/06-ladder.md)               | [`curriculum.md`](reference/curriculum.md)     |
+| 7    | [`07-sprint.md`](reference/stages/07-sprint.md)               | [`curriculum.md`](reference/curriculum.md)     |
+| 8    | [`08-exam-bank.md`](reference/stages/08-exam-bank.md)         | [`examination.md`](reference/examination.md)   |
+| 9    | [`09-feynman-notes.md`](reference/stages/09-feynman-notes.md) | [`examination.md`](reference/examination.md)   |
+| 10   | [`10-cheatsheet.md`](reference/stages/10-cheatsheet.md)       | [`retention.md`](reference/retention.md)       |
 
 ### 最终化
 
