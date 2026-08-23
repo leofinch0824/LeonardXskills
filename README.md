@@ -7,7 +7,7 @@
 把工作与学习中反复出现的方法沉淀为可复用、可验证、可移植的 Agent Skill。所有 skill 采用标准 `SKILL.md` 结构，强调明确的阶段契约、可追溯产物和自动化验证。
 
 ![platform](https://img.shields.io/badge/Codex-supported-2ea44f?style=flat-square)
-![skills](https://img.shields.io/badge/skills-2-informational?style=flat-square)
+![skills](https://img.shields.io/badge/skills-3-informational?style=flat-square)
 ![lang](https://img.shields.io/badge/%E4%B8%AD%E6%96%87%E4%BC%98%E5%85%88-blue?style=flat-square)
 ![standard](https://img.shields.io/badge/Agent_Skills-compatible-8957e5?style=flat-square)
 ![license](https://img.shields.io/badge/license-MIT-yellow?style=flat-square)
@@ -19,6 +19,7 @@
 | skill | 用途 | 状态 |
 |---|---|:---:|
 | [**paper-trail**](#paper-trail) | 将业务或技术痛点翻译成学术问题，系统调研前沿论文，并产出带证据链、可追溯、可落地的方案简报 | 可用 |
+| [**paper-reading-assistant**](#paper-reading-assistant) | 以 Three-Pass 方法协作阅读单篇论文，判断相关性、证据质量、复现价值与下一步投入 | 可用 |
 | [**learn-loop**](#learn-loop) | 将“十倍速学习”方法固化为有来源分级、阶段闸门、题库施考、费曼复述和复习队列的中文学习闭环 | 可用 |
 
 安装方式见「[安装](#安装)」，实际运行方式见「[快速开始](#快速开始)」。
@@ -86,6 +87,56 @@
 
 ---
 
+## paper-reading-assistant
+
+<a id="paper-reading-assistant"></a>
+
+`paper-reading-assistant` 是一套面向**单篇论文**的协作式渐进阅读协议。它以 Keshav 的 Three-Pass 方法为骨架，把用户要做的决定、论文的外部状态、主张与证据、复现缺口和下一步投入组织成可暂停、可复核的阅读过程。它不做多篇论文批量筛选，也不把一篇论文压缩成缺乏证据边界的一段通用摘要。
+
+### 核心理念：渐进深度 + 人在回路
+
+每次阅读先澄清目的与熟悉程度，再按需从 Pass 1、Pass 2 或 Pass 3 开始；每一遍都在交付显式判断后停下，不静默升级到下一遍。
+
+```
+开场两问 → Pass 1 筛选 → ⛔ 检查点
+                         → Pass 2 理解 → ⛔ 用户授权
+                                           → Pass 3 深入 / 复现
+```
+
+| 阶段 | 核心动作 | 主要产物 |
+|:-:|---|---|
+| 0 | 澄清阅读目的与子领域熟悉度；若只需事实、引用或两行要点则直接回答 | 对话中的阅读目标与深度边界 |
+| 1 | 扫读论文结构，回答 Keshav 的 Five Cs，并核验发表、评审与引用状态 | 论文筛选报告 |
+| 2 | 细读核心方法与结果，建立理解图谱、主张—证据对照和可迁移零件 | `.paper-reading/<slug>/pass2-understanding.md` |
+| 3 | 在用户授权后反向工程、检查假设、规划复现或批判性复核 | `.paper-reading/<slug>/pass3-deep-dive.md` |
+
+### 关键设计
+
+- **单篇约束**：一次只读一篇论文；收到多篇时先列清单并请用户选择，不默默取第一篇。
+- **证据纪律**：维护来源台账，并将实质性陈述明确标为 `Observation`、`Author claim` 或 `Inference`；证据不可得时不补写数据、baseline、实现细节或引用。
+- **外部状态先核验**：发表状态、公开评审记录和引用情况只报告实际检索结果；检索不可用时明确标记未核实，不凭记忆重构。
+- **红旗上浮**：会改变判断的证据问题在当前遍次报告顶部单独列出，不埋在表格的注意事项中。
+- **用户判断不代做**：问题重要性、当前最强 baseline 和收益是否有实践意义等判断，交还给用户在「需要你判断」下决定。
+- **深度闸门**：Pass 1 后停止一次；Pass 3 只能在相关性与证据支持继续投入、且用户明确授权后开始。
+
+### 触发方式
+
+明确调用 `$paper-reading-assistant`，并提供一篇论文的链接、PDF 或可访问材料：
+
+```text
+使用 $paper-reading-assistant 阅读这篇论文：
+<论文链接或 PDF>
+我想判断它是否值得复现；我对这个子领域有工作基础。
+```
+
+**适用场景**：判断论文是否值得投入时间、理解核心方法和证据、准备复现或严谨评审；需要将阅读过程保留为可继续的研究资产。
+
+**不适用**：批量文献筛选、只查一个事实或引用格式、只需要两行摘要。
+
+详细流程见 [`skills/paper-reading-assistant/SKILL.md`](./skills/paper-reading-assistant/SKILL.md)，Pass 3 反向工程和批判性复核见 [`skills/paper-reading-assistant/references/deep-dive.md`](./skills/paper-reading-assistant/references/deep-dive.md)，Three-Pass 保真度审计见 [`skills/paper-reading-assistant/references/THREE_PASS_FIDELITY_AUDIT.md`](./skills/paper-reading-assistant/references/THREE_PASS_FIDELITY_AUDIT.md)。
+
+---
+
 ## learn-loop
 
 <a id="learn-loop"></a>
@@ -119,16 +170,19 @@ Learn Loop 的阶段契约、实现计划和当前评估见 [`docs/plans/learn-l
 git clone https://github.com/leofinch0824/LeonardXskills.git
 mkdir -p ~/.codex/skills
 cp -R LeonardXskills/skills/paper-trail ~/.codex/skills/
+cp -R LeonardXskills/skills/paper-reading-assistant ~/.codex/skills/
 cp -R LeonardXskills/skills/learn-loop ~/.codex/skills/
 ```
 
-重新打开 Codex 会话后，通过 `$paper-trail` 或 `$learn-loop` 显式调用。
+重新打开 Codex 会话后，通过 `$paper-trail`、`$paper-reading-assistant` 或 `$learn-loop` 显式调用。
 
 **方式二 · 在仓库中直接使用**
 
 让 Agent 读取当前仓库的 `skills/paper-trail/SKILL.md`，并明确要求按照该流程执行。此方式适合开发、调试和修改 skill。
 
 > `paper-trail` 默认保持 skill 包只读；Profile 写入目标工作区的 `.paper-trail/`，调研产物写入目标工作区的 `research/`。
+
+对单篇论文阅读任务，让 Agent 读取当前仓库的 `skills/paper-reading-assistant/SKILL.md`，并明确要求按照该流程执行；从 Pass 2 起，它会把阅读产物写入目标工作区的 `.paper-reading/<slug>/`，且不会自行进入 Pass 3。
 
 对学习任务，让 Agent 读取 `skills/learn-loop/SKILL.md`；它会把运行状态写入目标工作区的 `.learn-loop/`，把 Markdown 事实源与 HTML 视图写入 `learning/`。
 
@@ -156,11 +210,15 @@ poetry run python skills/paper-trail/scripts/preflight.py \
 
 未配置可选后端时，报告为 `degraded` 是预期行为；只有 skill 包或运行数据不完整才会进入 `blocked`。
 
-### 3. 按需填写 Profile
+### 3. 阅读一篇论文
+
+把论文的链接、PDF 或可访问材料交给 Agent，明确调用 `$paper-reading-assistant`。它会先询问阅读要支持的决定和你的熟悉程度，再按目标进入对应的 Pass；每一遍结束后都会给出是否继续的判断。若只需一个事实、引用格式或两行要点，则不启动完整阅读协议。
+
+### 4. 按需填写 Profile
 
 Preflight 首次运行会创建 `.paper-trail/profile.md`。只需补齐本轮方案判断真正依赖的字段：微调能力、算力预算、权重要求、数据出域规则、延迟要求和 License 限制。
 
-### 4. 可选能力
+### 5. 可选能力
 
 | 能力 | 配置 | 未配置时 |
 |---|---|---|
@@ -186,6 +244,9 @@ LeonardXskills/
 │   │   ├── worker_boundary.py   # Worker 端点与数据边界分类
 │   │   └── extract_paper.py     # OpenAI-compatible 结构化抽取 Worker
 │   └── templates/               # 每轮调研的标准化 Markdown 产物
+├── skills/paper-reading-assistant/
+│   ├── SKILL.md                 # 单篇论文的 Three-Pass 协作阅读协议
+│   └── references/              # Pass 3 指南、中文说明与保真度审计
 ├── skills/learn-loop/
 │   ├── SKILL.md                 # 十步流程、不变量、模式 A/B/C 与闸门
 │   ├── reference/               # 法条提示词、纪律附录与 HTML 指南
@@ -210,6 +271,6 @@ poetry run python -m py_compile skills/learn-loop/scripts/*.py
 
 ## License
 
-- **paper-trail** — [MIT License](./LICENSE)，可在保留版权与许可声明的前提下使用、修改与分发。
+- **paper-trail**、**paper-reading-assistant**、**learn-loop** — [MIT License](./LICENSE)，可在保留版权与许可声明的前提下使用、修改与分发。
 
 问题与建议欢迎通过 [Issue](https://github.com/leofinch0824/LeonardXskills/issues) 反馈。
