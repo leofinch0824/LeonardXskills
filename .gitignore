@@ -8,8 +8,10 @@ __pycache__/
 # Local-only development and test content
 .python-version
 .learn-loop
-.od-skills
 learning
 tests
 .agents
 .claude
+.paper-reading
+pyproject.toml
+poetry.lock
