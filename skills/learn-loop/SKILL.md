@@ -10,15 +10,16 @@ description: >-
 
 ## 先守住这些边界
 
-1. [`reference/original-prompts.md`](reference/original-prompts.md) 是不可改动的设计意图与溯源原文。阶段上下文必须包含当前步骤的连续原文切片；不要改写、删减或把执行契约反写进原文。
+1. [`reference/original-prompts.md`](reference/original-prompts.md) 是不可改动的设计意图与溯源原文。执行各步骤时以其对应原文切片为准；不要改写、删减或把执行契约反写进原文。
 2. `reference/stages/*.md` 是阶段语义权威，`reference/modes/*.md` 是真实互动权威，`templates/*.md` 只定义序列化。验证器不得成为未写明的新规范，也不得自动修复产物。
-3. 只读取 `prepare_stage.py` 为当前步骤生成的 context 包。当前步骤未通过前，不读取未来步骤契约、范本或产物；步骤 7/8 按两批披露。
+3. 只在对应步骤通过 `prepare_stage.py` 闸门后，按返回的`read`清单读取该步骤的契约、原文与范本；当前步骤未通过校验前，不读取未来步骤的契约、范本或产物。
 4. 第 1 步的五个角色各自只读自己的任务包、只写自己的 `perspectives/*.md`。父 agent 等五份角色文件分别通过校验后，才写 `01-perspectives.md`；核心字段逐字抽取，完整分析留在角色文件。
 5. 来源等级固定为：`A` = 可解析 URL 直接支持主张；`B` = 有 URL 但间接、转述或只支持一部分；`C` = 模型先验或未验证。未实测检索能力时进入`未锚定模式`，不得凭记忆补 URL。
    步骤 2 只有不同来源且至少一条 A/B 的共同结论可标`独立共识`；全 C 只能标`模型先验·待验证`。五份检索完整后才可把候选遗漏标为`领域盲区`，否则标`未覆盖`。
-6. 步骤 1–10 的`本步提炼`恰好三条：核心结论、证据/边界/风险、对下一步的影响。普通字段使用`- **字段：** 值`；跨文件引用使用`相对路径#精确标题`。
+   anchored 模式的 A/B 来源经`audit_sources.py`机读审计：A 级要求正文重合达标，B 级要求链接存活；未决发现清零才算通过步骤 1。
+6. 步骤 1–10 的`本步提炼`为 2–4 条（建议三条）：核心结论、证据/边界/风险、对下一步的影响。普通字段使用`- **字段：** 值`；跨文件引用使用`相对路径#精确标题`。
 7. 模式 A 不创建真实回答、得分、逐字复述、考试游标或费曼轮次。模式 B/C 不代答；用户没回答就不增加完成记录和游标。
-8. `run-state.md`只保存运行、画像、能力、模式 A 进度和实际披露记录。考试事实只在`08-exam-record.md`，费曼事实只在`09-feynman-record.md`。
+8. `run-state.md`只保存运行、画像、能力和模式 A 进度。考试事实只在`08-exam-record.md`，费曼事实只在`09-feynman-record.md`。
 9. HTML 是 Markdown 的静态渲染视图，不在浏览器读取 Markdown，不补写事实。长期画像只在用户明确授权且提供确认原话时更新。
 
 ## 前置判断
@@ -82,7 +83,13 @@ python3 <skill-root>/scripts/validate_stage.py \
   --run-dir <run-dir> --role <实践者|学者|怀疑者|经济学家|历史学家> --json
 ```
 
-五份都通过后，父 agent 读取五份完整角色文件，填写`01-perspectives.md`并验证阶段 1。不要让角色并发写父级汇总或`run-state.md`。
+五份都通过后，anchored 模式先运行来源审计并清零未决发现：
+
+```bash
+python3 <skill-root>/scripts/audit_sources.py --run-dir <run-dir> --json
+```
+
+A 级 URL 必须实际抓取成功且主张关键词与正文重合达标，B 级必须链接存活；`建议降级`与`链接失效`按角色文件修正（A→B/A→C/换源）后重跑角色校验与审计。跨角色共用母站会列入提示，供步骤 2 独立性判定消费。审计通过后，父 agent 读取五份完整角色文件，填写`01-perspectives.md`并验证阶段 1。不要让角色并发写父级汇总或`run-state.md`。
 
 ### 步骤 2–10：统一阶段协议
 
@@ -93,7 +100,7 @@ python3 <skill-root>/scripts/prepare_stage.py \
   --run-dir <run-dir> --stage <N> --json
 ```
 
-只读取返回的当前 context，填写已物化的当前输出；不要覆盖已有的非空产物。完成后：
+只填写已物化的当前输出；按返回的`read`清单读取当前步骤的契约、原文与范本（上游产物清单见范本的`消费上游`表）。不要覆盖已有的非空产物。完成后：
 
 ```bash
 python3 <skill-root>/scripts/validate_stage.py \
@@ -101,17 +108,6 @@ python3 <skill-root>/scripts/validate_stage.py \
 ```
 
 验证失败只修当前产物或它明确指出的上游，不跳过阶段。脚本检查结构、数量、枚举、引用和事实源边界；父 agent 仍需评审证据是否真的支持主张、分歧分类、评分理由和教学质量。
-
-步骤 7/8 使用两批：
-
-```bash
-python3 <skill-root>/scripts/prepare_stage.py --run-dir <run-dir> --stage <7|8> --batch 1 --json
-python3 <skill-root>/scripts/validate_stage.py --run-dir <run-dir> --stage <7|8> --batch 1 --json
-python3 <skill-root>/scripts/prepare_stage.py --run-dir <run-dir> --stage <7|8> --batch 2 --json
-python3 <skill-root>/scripts/validate_stage.py --run-dir <run-dir> --stage <7|8> --batch 2 --json
-```
-
-批次 2 只有在批次 1 通过后才生成；两批写同一阶段文件，并在同一披露记录追加第二个 context 路径。
 
 ### 当前步骤的规范入口
 
@@ -171,7 +167,7 @@ python3 <skill-root>/scripts/finalize_run.py \
 
 脚本能确认：结构、数量、枚举、引用、上下游、无模拟互动、HTML 离线资源、INDEX / queue 幂等性。执行模型不能自证以下事项，交付时明确请用户复核：
 
-- 来源是否真的支持对应主张；
+- 来源是否真的支持对应主张（来源审计的重合度只是关键词启发式，不能替代人工判断）；
 - 分歧、共识和盲区的语义判断是否合理；
 - 评分和教学内容是否有质量；
 - 模式 B/C 的逐字内容是否真是用户原话；

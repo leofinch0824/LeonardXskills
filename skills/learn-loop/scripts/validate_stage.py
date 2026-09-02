@@ -544,8 +544,6 @@ def _check_common(
     run_dir: Path,
     file: str,
     violations: list[ContractViolation],
-    *,
-    check_takeaways: bool = True,
 ) -> None:
     _check_execution(stage, document, file, violations)
     _one_section(document, file, "消费上游", 2, violations)
@@ -561,19 +559,19 @@ def _check_common(
             expected="无 {{...}}",
             actual="存在占位符",
         )
-    if check_takeaways and takeaways is not None:
+    if takeaways is not None:
         items = [
             match.group(1).strip()
             for match in re.finditer(r"(?m)^-\s+(\S.*)$", takeaways.body)
         ]
-        if len(items) != 3:
+        if not 2 <= len(items) <= 4:
             _add(
                 violations,
                 file,
                 "TAKEAWAY_COUNT",
-                f"本步提炼必须恰好 3 条，实际 {len(items)} 条",
+                f"本步提炼必须为 2–4 条（建议 3 条），实际 {len(items)} 条",
                 record="本步提炼",
-                expected="3",
+                expected="2–4",
                 actual=str(len(items)),
             )
         for index, value in enumerate(items, start=1):
@@ -628,7 +626,6 @@ def _validate_stage_0(
             "学习画像",
             "能力与降级",
             "模式 A 进度",
-            "上下文披露记录",
         )
     }
     _check_upstreams("0", document, run_dir, file, violations)
@@ -873,69 +870,6 @@ def _validate_stage_0(
                 actual=f"{current} / {status}",
             )
 
-    disclosure = sections["上下文披露记录"]
-    if disclosure is not None:
-        disclosure_records = exact_sections(
-            document, 3, r"阶段 (?:0|[1-9]\d*)"
-        )
-        titles = [record.title for record in disclosure_records]
-        if len(titles) != len(set(titles)):
-            _add(
-                violations,
-                file,
-                "DISCLOSURE_DUPLICATE",
-                "同一阶段只能有一条上下文披露记录",
-                record="上下文披露记录",
-                expected="每阶段唯一",
-                actual="、".join(titles),
-            )
-        numbers = [int(record.title.removeprefix("阶段 ")) for record in disclosure_records]
-        if numbers and numbers != list(range(0, max(numbers) + 1)):
-            _add(
-                violations,
-                file,
-                "DISCLOSURE_CONTINUITY",
-                "上下文披露记录必须从阶段 0 连续追加",
-                record="上下文披露记录",
-                expected=f"0–{max(numbers)}",
-                actual="、".join(map(str, numbers)),
-            )
-        for record in disclosure_records:
-            _check_fields(record, file, ("准备时间", "披露清单"), violations)
-            if not _iso_with_timezone(record.fields.get("准备时间", "")):
-                _add(
-                    violations,
-                    file,
-                    "TIMESTAMP",
-                    f"{record.title}准备时间必须为带时区 ISO 8601",
-                    record=record.title,
-                    field="准备时间",
-                    expected="带时区 ISO 8601",
-                    actual=record.fields.get("准备时间", ""),
-                )
-        current = normalize_value(
-            sections["模式 A 进度"].fields.get("当前阶段", "")
-        ).strip("。") if sections["模式 A 进度"] else ""
-        if current.isdigit() and numbers != list(range(0, int(current) + 1)):
-            _add(
-                violations,
-                file,
-                "DISCLOSURE_PROGRESS",
-                "已准备阶段必须与模式 A 当前阶段一致",
-                record="上下文披露记录",
-                expected=f"0–{current}",
-                actual="、".join(map(str, numbers)) or "无",
-            )
-        if current == "完成" and numbers != list(range(0, 11)):
-            _add(
-                violations,
-                file,
-                "DISCLOSURE_PROGRESS",
-                "完成状态必须保留阶段 0–10 的披露记录",
-                record="上下文披露记录",
-                expected="0–10",
-                actual="、".join(map(str, numbers)) or "无",
-            )
     for forbidden in ("当前考试游标", "弱项", "施考状态", "费曼状态", "已完成题数"):
         if forbidden in document.text:
             _add(
@@ -1180,6 +1114,37 @@ def _validate_stage_1(
                     expected=expected_value,
                     actual=actual_value,
                 )
+    _check_source_audit(run_dir, file, violations)
+
+
+def _check_source_audit(run_dir: Path, file: str, violations: list) -> None:
+    """anchored 模式下，来源审计报告必须存在且未决发现为零。"""
+    if _state_value(run_dir, "锚定模式") != "anchored":
+        return
+    audit_path = run_dir / "context" / "source-audit.md"
+    if not audit_path.is_file():
+        _add(
+            violations,
+            file,
+            "AUDIT_MISSING",
+            "锚定来源必须运行 audit_sources.py 并留存 context/source-audit.md",
+            expected="审计报告存在",
+            actual="缺失",
+        )
+        return
+    match = re.search(
+        r"(?m)^-\s+\*\*未决发现：\*\*\s*(\d+)\s*$",
+        audit_path.read_text(encoding="utf-8"),
+    )
+    if match is None or match.group(1) != "0":
+        _add(
+            violations,
+            file,
+            "AUDIT_UNRESOLVED",
+            "来源审计存在未决发现：降级、换源后重跑 audit_sources.py",
+            expected="未决发现： 0",
+            actual=f"未决发现： {match.group(1) if match else '字段缺失'}",
+        )
 
 
 def _view_names(value: str) -> set[str]:
@@ -1782,11 +1747,8 @@ def _validate_stage_7(
     run_dir: Path,
     file: str,
     violations: list[ContractViolation],
-    batch: int | None,
 ) -> None:
-    _check_common(
-        "7", document, run_dir, file, violations, check_takeaways=batch != 1
-    )
+    _check_common("7", document, run_dir, file, violations)
     _check_exact_titles(
         document,
         3,
@@ -1807,8 +1769,7 @@ def _validate_stage_7(
             expected="10",
             actual=str(len(lessons)),
         )
-    selected = lessons[:5] if batch == 1 else lessons
-    for lesson in selected:
+    for lesson in lessons:
         _check_fields(
             lesson,
             file,
@@ -1826,10 +1787,9 @@ def _validate_stage_7(
                 expected="5",
                 actual=str(len(questions)),
             )
-    if batch != 1:
-        project = _one_section(document, file, "终局小项目", 3, violations)
-        if project is not None:
-            _check_fields(project, file, ("输入", "动作", "可检查输出", "完成标准"), violations)
+    project = _one_section(document, file, "终局小项目", 3, violations)
+    if project is not None:
+        _check_fields(project, file, ("输入", "动作", "可检查输出", "完成标准"), violations)
 
 
 def _table_rows(section: Section) -> list[list[str]]:
@@ -1848,11 +1808,8 @@ def _validate_stage_8(
     run_dir: Path,
     file: str,
     violations: list[ContractViolation],
-    batch: int | None,
 ) -> None:
-    _check_common(
-        "8", document, run_dir, file, violations, check_takeaways=batch != 1
-    )
+    _check_common("8", document, run_dir, file, violations)
     _check_exact_titles(
         document,
         3,
@@ -1893,7 +1850,7 @@ def _validate_stage_8(
                 expected="10",
                 actual=str(len(data)),
             )
-        selected_rows = data[:5] if batch == 1 else data
+        selected_rows = data
         for index, row in enumerate(selected_rows, start=1):
             if len(row) != 4 or row[0] != str(index) or row[-1] != expected_difficulty[index]:
                 _add(
@@ -1926,7 +1883,7 @@ def _validate_stage_8(
             expected="10",
             actual=str(len(questions)),
         )
-    selected_questions = questions[:5] if batch == 1 else questions
+    selected_questions = questions
     for index, question in enumerate(selected_questions, start=1):
         _check_fields(
             question,
@@ -1946,43 +1903,42 @@ def _validate_stage_8(
                 expected=expected_difficulty[index],
                 actual=actual,
             )
-    if batch != 1:
-        challenge = _one_section(document, file, "终极挑战", 3, violations)
-        if challenge is not None:
-            items = _numbered_items(challenge.body)
-            if len(items) != 5 or any(is_sentinel(item) for item in items):
-                _add(
-                    violations,
-                    file,
-                    "CHALLENGE_COUNT",
-                    f"终极挑战必须恰好 5 道无答案题，实际 {len(items)}",
-                    record="终极挑战",
-                    expected="5",
-                    actual=str(len(items)),
-                )
-            if "答案" in challenge.body or "评分标准" in challenge.body:
-                _add(
-                    violations,
-                    file,
-                    "CHALLENGE_ANSWER",
-                    "终极挑战禁止附答案或评分标准",
-                    record="终极挑战",
-                    expected="只含题干",
-                    actual="含答案或评分标准",
-                )
-            extra = re.sub(
-                r"(?m)^\s*\d+[.)、]\s+\S.*$", "", challenge.body
-            ).strip()
-            if extra:
-                _add(
-                    violations,
-                    file,
-                    "CHALLENGE_EXTRA",
-                    "终极挑战章节只能包含五道编号题干",
-                    record="终极挑战",
-                    expected="仅五道题干",
-                    actual=extra,
-                )
+    challenge = _one_section(document, file, "终极挑战", 3, violations)
+    if challenge is not None:
+        items = _numbered_items(challenge.body)
+        if len(items) != 5 or any(is_sentinel(item) for item in items):
+            _add(
+                violations,
+                file,
+                "CHALLENGE_COUNT",
+                f"终极挑战必须恰好 5 道无答案题，实际 {len(items)}",
+                record="终极挑战",
+                expected="5",
+                actual=str(len(items)),
+            )
+        if "答案" in challenge.body or "评分标准" in challenge.body:
+            _add(
+                violations,
+                file,
+                "CHALLENGE_ANSWER",
+                "终极挑战禁止附答案或评分标准",
+                record="终极挑战",
+                expected="只含题干",
+                actual="含答案或评分标准",
+            )
+        extra = re.sub(
+            r"(?m)^\s*\d+[.)、]\s+\S.*$", "", challenge.body
+        ).strip()
+        if extra:
+            _add(
+                violations,
+                file,
+                "CHALLENGE_EXTRA",
+                "终极挑战章节只能包含五道编号题干",
+                record="终极挑战",
+                expected="仅五道题干",
+                actual=extra,
+            )
 
 
 def _validate_stage_9(
@@ -1999,21 +1955,20 @@ def _validate_stage_9(
         file,
         violations,
     )
+    explanation = _one_section(document, file, "12 岁版讲解", 3, violations)
+    _check_free_text(explanation, file, violations)
+    examples = _records(document, 4, "生活例子")
+    _expect_numbered_records(examples, file, "生活例子", (1, 3), violations)
     _check_exact_titles(
         document,
         4,
         [
-            "生活例子 1",
-            "生活例子 2",
+            *(f"生活例子 {index}" for index in range(1, len(examples) + 1)),
             *(f"复述检查点 {index}" for index in range(1, len(_records(document, 4, "复述检查点")) + 1)),
         ],
         file,
         violations,
     )
-    explanation = _one_section(document, file, "12 岁版讲解", 3, violations)
-    _check_free_text(explanation, file, violations)
-    examples = _records(document, 4, "生活例子")
-    _expect_numbered_records(examples, file, "生活例子", 2, violations)
     for example in examples:
         _check_fields(example, file, ("场景", "对应关系", "例子边界"), violations)
     checkpoints = _records(document, 4, "复述检查点")
@@ -2380,6 +2335,8 @@ VALIDATORS = {
     "4": _validate_stage_4,
     "5": _validate_stage_5,
     "6": _validate_stage_6,
+    "7": _validate_stage_7,
+    "8": _validate_stage_8,
     "9": _validate_stage_9,
     "10": _validate_stage_10,
     "exam-record": _validate_exam_record,
@@ -2387,27 +2344,18 @@ VALIDATORS = {
 }
 
 
-def validate_one(
-    stage: str, run_dir: Path, batch: int | None = None
-) -> list[ContractViolation]:
+def validate_one(stage: str, run_dir: Path) -> list[ContractViolation]:
     run_dir = Path(run_dir).expanduser().resolve()
     if stage == "html":
         return validate_html(run_dir)
     if stage not in STAGE_FILES:
         raise ValueError(f"未知阶段：{stage}")
-    if batch is not None and (stage not in {"7", "8"} or batch not in {1, 2}):
-        raise ValueError("只有阶段 7/8 接受 batch=1|2")
     file = STAGE_FILES[stage]
     violations: list[ContractViolation] = []
     document = _read_document(run_dir / file, violations)
     if document is None:
         return violations
-    if stage == "7":
-        _validate_stage_7(document, run_dir, file, violations, batch)
-    elif stage == "8":
-        _validate_stage_8(document, run_dir, file, violations, batch)
-    else:
-        VALIDATORS[stage](document, run_dir, file, violations)
+    VALIDATORS[stage](document, run_dir, file, violations)
     return violations
 
 
@@ -2438,7 +2386,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--role", choices=ROLES)
     parser.add_argument("--all", action="store_true")
-    parser.add_argument("--batch", type=int, choices=(1, 2))
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -2447,9 +2394,6 @@ def main() -> int:
     args = parse_args()
     if sum((bool(args.stage), bool(args.role), args.all)) != 1:
         print("必须且只能选择 --stage、--role 或 --all", file=sys.stderr)
-        return 2
-    if args.batch is not None and args.stage not in {"7", "8"}:
-        print("--batch 仅适用于阶段 7/8", file=sys.stderr)
         return 2
     run_dir = Path(args.run_dir).expanduser().resolve()
     if args.all:
@@ -2461,7 +2405,7 @@ def main() -> int:
         raw = {key: validate_role(args.role, run_dir)}
     else:
         stages = [args.stage]
-        raw = {args.stage: validate_one(args.stage, run_dir, args.batch)}
+        raw = {args.stage: validate_one(args.stage, run_dir)}
     violations = {
         stage: [item.to_dict() for item in items]
         for stage, items in raw.items()

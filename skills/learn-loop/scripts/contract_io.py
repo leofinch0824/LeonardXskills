@@ -23,6 +23,7 @@ STATE_SECTIONS = (
     "能力与降级",
     "模式 A 进度",
 )
+ROLE_NAMES = ("实践者", "学者", "怀疑者", "经济学家", "历史学家")
 SENTINEL_TERMS = (
     "待填写",
     "待抽取",
@@ -157,6 +158,33 @@ def _split_table_row(line: str) -> list[str]:
     return [cell.strip() for cell in stripped.strip("|").split("|")]
 
 
+def markdown_table_rows(text: str) -> list[list[str]]:
+    """Split pipe-table lines into stripped cells; separator rows are skipped."""
+    rows = []
+    for line in text.splitlines():
+        cells = _split_table_row(line)
+        if not cells or all(TABLE_SEPARATOR.fullmatch(cell) for cell in cells):
+            continue
+        rows.append(cells)
+    return rows
+
+
+def role_channel_table(text: str) -> dict[str, tuple[str, str]]:
+    """Map each statute role to (优先渠道, 重点追问) in perspectives.md.
+
+    Cell alignment padding is an implementation detail of the document and
+    must stay irrelevant to this parse.
+    """
+    section = re.search(r"(?ms)^## 视角与渠道\s*$\n(.*?)(?=^## |\Z)", text)
+    if section is None:
+        raise ValueError("perspectives.md 缺少「视角与渠道」章节")
+    table: dict[str, tuple[str, str]] = {}
+    for cells in markdown_table_rows(section.group(1)):
+        if len(cells) >= 3 and cells[0] in ROLE_NAMES:
+            table[cells[0]] = (cells[1], cells[2])
+    return table
+
+
 def parse_upstream_table(document: MarkdownDocument) -> tuple[str, ...]:
     matches = document.find("消费上游", level=2)
     if len(matches) != 1:
@@ -277,59 +305,8 @@ def _replace_unique_field(text: str, label: str, value: str) -> str:
     return expression.sub(lambda match: match.group("prefix") + value, text, count=1)
 
 
-def _append_disclosure(text: str, disclosure: dict) -> str:
-    stage = disclosure["stage"]
-    heading = f"### 阶段 {stage}"
-    if heading in text:
-        raise ValueError(f"上下文披露记录已存在：阶段 {stage}")
-    items = disclosure.get("items", [])
-    item_lines = "\n".join(f"  - {item}" for item in items) or "  - 无"
-    block = (
-        f"{heading}\n\n"
-        f"- **准备时间：** {disclosure['prepared_at']}\n"
-        f"- **披露清单：**\n{item_lines}\n"
-    )
-    marker = "## 上下文披露记录"
-    if marker not in text:
-        raise ValueError("运行状态缺少上下文披露记录章节")
-    before, after = text.split(marker, 1)
-    after = re.sub(
-        r"^\s*无：尚未准备模式 A 阶段。\s*",
-        "\n\n",
-        after,
-        count=1,
-    )
-    return before + marker + after.rstrip() + "\n\n" + block
-
-
-def update_run_state(
-    path: Path,
-    updates: dict[str, str],
-    disclosure: dict | None = None,
-) -> None:
+def update_run_state(path: Path, updates: dict[str, str]) -> None:
     text = path.read_text(encoding="utf-8")
     for label, value in updates.items():
         text = _replace_unique_field(text, label, value)
-    if disclosure is not None:
-        text = _append_disclosure(text, disclosure)
     atomic_write(path, text.rstrip() + "\n")
-
-
-def append_disclosure_items(path: Path, stage: int, items: list[str]) -> None:
-    """Append new paths to one existing disclosure record without duplicating them."""
-    text = path.read_text(encoding="utf-8")
-    expression = re.compile(
-        rf"(?ms)^### 阶段 {stage}\s*$\n(?P<body>.*?)(?=^### 阶段 \d+\s*$|\Z)"
-    )
-    match = expression.search(text)
-    if match is None:
-        raise ValueError(f"上下文披露记录不存在：阶段 {stage}")
-    body = match.group("body").rstrip()
-    if "- **披露清单：**" not in body:
-        raise ValueError(f"上下文披露记录缺少披露清单：阶段 {stage}")
-    additions = [item for item in items if f"  - {item}" not in body]
-    if not additions:
-        return
-    replacement = body + "\n" + "\n".join(f"  - {item}" for item in additions) + "\n\n"
-    updated = text[: match.start("body")] + replacement + text[match.end("body") :]
-    atomic_write(path, updated.rstrip() + "\n")

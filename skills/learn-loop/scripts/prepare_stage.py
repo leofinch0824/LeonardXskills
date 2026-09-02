@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare one Learn Loop stage without disclosing future-stage context."""
+"""Gate, materialize, and point to contract files for one Learn Loop stage."""
 
 from __future__ import annotations
 
@@ -19,10 +19,10 @@ if str(SCRIPT_ROOT) not in sys.path:
 
 from contract_io import (
     ContractViolation,
-    append_disclosure_items,
     atomic_write,
     is_sentinel,
     read_run_state,
+    role_channel_table,
     update_run_state,
 )
 
@@ -97,13 +97,13 @@ def _role_guidance(role: str) -> str:
     discipline = (SKILL_ROOT / "reference" / "perspectives.md").read_text(
         encoding="utf-8"
     )
-    row = re.search(rf"(?m)^\| {re.escape(role)} \|.*\|$", discipline)
-    if row is None:
+    channels = role_channel_table(discipline)
+    if role not in channels:
         raise ValueError(f"角色纪律中找不到视角：{role}")
-    cells = [cell.strip() for cell in row.group(0).strip("|").split("|")]
+    channel, question = channels[role]
     return (
-        f"- **优先渠道：** {cells[1]}\n"
-        f"- **重点追问：** {cells[2]}\n"
+        f"- **优先渠道：** {channel}\n"
+        f"- **重点追问：** {question}\n"
         "- **隔离边界：** 不读取其他角色产物；失败检索同样保留。"
     )
 
@@ -169,143 +169,18 @@ def _read_state_if_available(run_dir: Path) -> dict[str, str]:
     return read_run_state(state_path) if state_path.is_file() else {}
 
 
-def _source_paths_for_stage(stage: int) -> list[str]:
-    contract = SKILL_ROOT / "reference" / "stages" / CONTRACT_FILES[stage]
-    if not contract.is_file():
-        raise ValueError(f"阶段契约不存在：{contract}")
-    sources = [
-        str(contract.relative_to(SKILL_ROOT)),
-        f"templates/{STAGE_FILES[stage]}",
-    ]
-    if stage:
-        sources.insert(0, "reference/original-prompts.md")
-    return sources
-
-
 def _contract_path(stage: int) -> Path:
     return SKILL_ROOT / "reference" / "stages" / CONTRACT_FILES[stage]
 
 
-def _upstream_paths(stage: int, template_text: str) -> list[str]:
-    if stage == 0:
-        return []
-    match = re.search(
-        r"(?ms)^## 消费上游\s*$\n(?P<body>.*?)(?=^##\s|\Z)", template_text
-    )
-    if match is None:
-        raise ValueError("输出范本缺少消费上游章节")
-    paths = []
-    for reference in re.findall(r"`([^`]+\.md)`", match.group("body")):
-        if reference not in paths:
-            paths.append(reference)
-    return paths
-
-
-def _context_path(run_dir: Path, stage: int, batch: int | None) -> Path:
-    suffix = f"-batch-{batch}" if batch is not None else ""
-    return run_dir / "context" / f"stage-{stage:02d}{suffix}.md"
-
-
-def _upstream_snapshot(relative: str, path: Path) -> str:
-    text = path.read_text(encoding="utf-8")
-    if relative == "run-state.md":
-        text = text.split("\n## 模式 A 进度\n", 1)[0]
-    return text.rstrip()
-
-
-def _completion_command(run_dir: Path, stage: int, batch: int | None) -> str:
-    batch_arg = f" --batch {batch}" if batch is not None else ""
-    return (
-        "python3 <skill-root>/scripts/validate_stage.py"
-        f" --run-dir {run_dir} --stage {stage}{batch_arg} --json"
-    )
-
-
-def build_stage_context(
-    run_dir: Path, stage: int, batch: int | None = None
-) -> tuple[Path, list[str]]:
-    """Build a self-contained parent packet for only the requested stage."""
-    state = _read_state_if_available(run_dir)
-    template_text = _materialize_stage_template(stage, state)
-    contract_path = _contract_path(stage)
-    contract_text = contract_path.read_text(encoding="utf-8")
-    disclosed = _source_paths_for_stage(stage)
-
-    sections = [
-        f"# 第 {stage} 步执行上下文" + (f" · 批次 {batch}" if batch else ""),
-        "",
-    ]
+def _read_list(stage: int) -> list[str]:
+    read = [str(_contract_path(stage).relative_to(SKILL_ROOT))]
     if stage:
-        original = extract_original_prompt(
-            stage, PROMPTS_PATH.read_text(encoding="utf-8")
-        )
-        sections.extend(
-            [
-                "## 原始提示词逐字片段",
-                "",
-                f"> 来源：`{PROMPTS_PATH.relative_to(SKILL_ROOT)}`；以下是连续原文切片。",
-                "",
-                original.rstrip(),
-                "",
-            ]
-        )
-    sections.extend(
-        [
-            "## 当前阶段契约",
-            "",
-            f"> 来源：`{contract_path.relative_to(SKILL_ROOT)}`",
-            "",
-            contract_text.rstrip(),
-            "",
-            "## 当前输出范本",
-            "",
-            f"> 来源：`templates/{STAGE_FILES[stage]}`",
-            "",
-            template_text.rstrip(),
-            "",
-            "## 允许消费的上游快照",
-            "",
-        ]
-    )
-    upstreams = _upstream_paths(stage, template_text)
-    if not upstreams:
-        sections.extend(["无运行目录上游。", ""])
-    for relative in upstreams:
-        path = run_dir / relative
-        if not path.is_file():
-            raise ValueError(f"允许消费的上游不存在：{relative}")
-        if stage == 1 and relative.startswith("perspectives/"):
-            sections.extend(
-                [
-                    f"### `{relative}`",
-                    "",
-                    "父级屏障后读取该路径的实际正式角色文件；准备阶段不快照空范本。",
-                    "",
-                ]
-            )
-            disclosed.append(relative)
-            continue
-        sections.extend([f"### `{relative}`", "", _upstream_snapshot(relative, path), ""])
-        disclosed.append(relative)
-    sections.extend(
-        [
-            "## 交付边界",
-            "",
-            f"- **唯一阶段输出：** `{STAGE_FILES[stage]}`",
-            f"- **完成校验：** `{_completion_command(run_dir, stage, batch)}`",
-        ]
-    )
+        read.append("reference/original-prompts.md")
+    read.append(f"templates/{STAGE_FILES[stage]}")
     if stage == 1:
-        expected = "、".join(f"`perspectives/{name}`" for name in ROLE_FILES.values())
-        sections.extend(
-            [
-                f"- **父级屏障：** {expected} 必须逐份通过角色校验后，才可汇总。",
-                "- **汇总规则：** 核心字段逐字抽取；完整角色分析保留在角色文件中。",
-            ]
-        )
-    context_path = _context_path(run_dir, stage, batch)
-    _write_once(context_path, "\n".join(sections))
-    return context_path, disclosed
+        read.extend(f"context/roles/{Path(name).stem}-task.md" for name in ROLE_FILES.values())
+    return read
 
 
 def build_role_packets(run_dir: Path, state: dict[str, str]) -> list[Path]:
@@ -360,7 +235,7 @@ def _prior_stage_violations(run_dir: Path, stage: int) -> list:
 
 
 def _state_gate_violations(
-    run_dir: Path, stage: int, batch: int | None
+    run_dir: Path, stage: int
 ) -> list[ContractViolation]:
     state_path = run_dir / "run-state.md"
     if not state_path.is_file():
@@ -377,12 +252,7 @@ def _state_gate_violations(
         ]
     state = read_run_state(state_path)
     actual = state.get("当前阶段", "").strip().strip("。")
-    if stage == 0:
-        allowed = {"0"}
-    elif batch == 2:
-        allowed = {str(stage)}
-    else:
-        allowed = {str(stage - 1), str(stage)}
+    allowed = {"0"} if stage == 0 else {str(stage - 1), str(stage)}
     if actual in allowed:
         return []
     return [
@@ -393,10 +263,7 @@ def _state_gate_violations(
             field="当前阶段",
             expected=" / ".join(sorted(allowed, key=int)),
             actual=actual or "缺失",
-            message=(
-                f"当前游标为 {actual or '缺失'}，不能准备阶段 {stage}"
-                + (f" 批次 {batch}" if batch else "")
-            ),
+            message=f"当前游标为 {actual or '缺失'}，不能准备阶段 {stage}",
         )
     ]
 
@@ -407,16 +274,6 @@ def _run_state_contract_violations(run_dir: Path, stage: int) -> list:
     import validate_stage
 
     return validate_stage.validate_one("0", run_dir)
-
-
-def _batch_gate_violations(
-    run_dir: Path, stage: int, batch: int | None
-) -> list:
-    if stage not in {7, 8} or batch != 2:
-        return []
-    import validate_stage
-
-    return validate_stage.validate_one(str(stage), run_dir, batch=1)
 
 
 def _initialize_known_state(run_dir: Path) -> None:
@@ -438,58 +295,37 @@ def _initialize_known_state(run_dir: Path) -> None:
         update_run_state(path, updates)
 
 
-def _record_disclosure(
-    run_dir: Path, stage: int, disclosed: list[str], context_path: Path
-) -> None:
-    state_path = run_dir / "run-state.md"
-    state_text = state_path.read_text(encoding="utf-8")
-    heading = f"### 阶段 {stage}"
-    if heading in state_text:
-        append_disclosure_items(
-            state_path,
-            stage,
-            [*disclosed, str(context_path.relative_to(run_dir))],
-        )
+def _advance_progress(run_dir: Path, stage: int) -> None:
+    """Move the run cursor forward; idempotent for reruns of the same stage."""
+    state = read_run_state(run_dir / "run-state.md")
+    if state.get("当前阶段", "").strip().strip("。") == str(stage):
         return
-    completed = "无" if stage == 0 else f"0–{stage - 1}"
     update_run_state(
-        state_path,
+        run_dir / "run-state.md",
         {
             "当前阶段": str(stage),
-            "已完成阶段": completed,
+            "已完成阶段": "无" if stage == 0 else f"0–{stage - 1}",
             "生成状态": "进行中",
-        },
-        {
-            "stage": stage,
-            "prepared_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "items": [*disclosed, str(context_path.relative_to(run_dir))],
         },
     )
 
 
-def prepare_stage(run_dir: Path, stage: int, batch: int | None = None) -> dict:
+def prepare_stage(run_dir: Path, stage: int) -> dict:
     """Gate and prepare one stage. Existing populated outputs are never overwritten."""
     run_dir = Path(run_dir).expanduser().resolve()
     if stage not in STAGE_FILES:
         raise ValueError(f"阶段必须为 0–10，实际 {stage}")
-    if batch is not None and (stage not in {7, 8} or batch not in {1, 2}):
-        raise ValueError("只有阶段 7/8 接受 --batch 1|2")
-    if stage in {7, 8} and batch is None:
-        raise ValueError("阶段 7/8 必须显式指定 --batch 1|2")
 
     run_dir.mkdir(parents=True, exist_ok=True)
-    violations = _state_gate_violations(run_dir, stage, batch)
+    violations = _state_gate_violations(run_dir, stage)
     violations.extend(_run_state_contract_violations(run_dir, stage))
     violations.extend(_prior_stage_violations(run_dir, stage))
-    violations.extend(_batch_gate_violations(run_dir, stage, batch))
     if violations:
         return {
             "ok": False,
             "stage": stage,
-            "batch": batch,
             "output": str(run_dir / STAGE_FILES[stage]),
-            "context": None,
-            "disclosed": [],
+            "read": [],
             "violations": [
                 item.to_dict() if hasattr(item, "to_dict") else str(item)
                 for item in violations
@@ -509,22 +345,14 @@ def prepare_stage(run_dir: Path, stage: int, batch: int | None = None) -> dict:
     elif not output_path.exists():
         atomic_write(output_path, _materialize_stage_template(stage, read_run_state(run_dir / "run-state.md")))
 
-    role_packets = []
     if stage == 1:
-        role_packets = build_role_packets(
-            run_dir, read_run_state(run_dir / "run-state.md")
-        )
-    context_path, disclosed = build_stage_context(run_dir, stage, batch)
-    if role_packets:
-        disclosed.extend(str(path.relative_to(run_dir)) for path in role_packets)
-    _record_disclosure(run_dir, stage, disclosed, context_path)
+        build_role_packets(run_dir, read_run_state(run_dir / "run-state.md"))
+    _advance_progress(run_dir, stage)
     return {
         "ok": True,
         "stage": stage,
-        "batch": batch,
         "output": str(output_path),
-        "context": str(context_path),
-        "disclosed": disclosed,
+        "read": _read_list(stage),
         "violations": [],
     }
 
@@ -533,7 +361,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run-dir", required=True)
     parser.add_argument("--stage", required=True, type=int, choices=range(0, 11))
-    parser.add_argument("--batch", type=int, choices=(1, 2))
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -541,15 +368,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        report = prepare_stage(Path(args.run_dir), args.stage, args.batch)
+        report = prepare_stage(Path(args.run_dir), args.stage)
     except (OSError, ValueError) as error:
         report = {
             "ok": False,
             "stage": args.stage,
-            "batch": args.batch,
             "output": None,
-            "context": None,
-            "disclosed": [],
+            "read": [],
             "violations": [str(error)],
         }
     if args.json:

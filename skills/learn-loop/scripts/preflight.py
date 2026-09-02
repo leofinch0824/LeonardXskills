@@ -11,6 +11,11 @@ from pathlib import Path
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_ROOT = Path(__file__).resolve().parent
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+import contract_io
 REQUIRED_SKILL_FILES = (
     "SKILL.md",
     "agents/openai.yaml",
@@ -23,6 +28,7 @@ REQUIRED_SKILL_FILES = (
     "reference/perspectives.md",
     "reference/retention.md",
     "scripts/preflight.py",
+    "scripts/audit_sources.py",
     "scripts/contract_io.py",
     "scripts/prepare_stage.py",
     "scripts/render_learning_page.py",
@@ -198,6 +204,32 @@ def check_runtime_artifacts(paths, errors):
     return not missing
 
 
+def check_role_discipline(errors):
+    """perspectives.md 的「视角与渠道」表必须解析出全部五个角色。
+
+    该表同时是角色任务包的机读输入；文档重排不得静默破坏步骤 1。
+    """
+    try:
+        text = (SKILL_ROOT / "reference" / "perspectives.md").read_text(
+            encoding="utf-8"
+        )
+        channels = contract_io.role_channel_table(text)
+    except (OSError, ValueError) as error:
+        errors.append(f"角色纪律表不可解析：{error}")
+        return False
+    problems = []
+    for role in contract_io.ROLE_NAMES:
+        entry = channels.get(role)
+        if entry is None:
+            problems.append(f"{role}（缺行）")
+        elif not all(entry):
+            problems.append(f"{role}（优先渠道/重点追问为空）")
+    if problems:
+        errors.append("视角与渠道表不完整：" + "、".join(problems))
+        return False
+    return True
+
+
 def inspect_capabilities(args, warnings):
     retrieval_verified = args.retrieval_verified
     if not retrieval_verified:
@@ -244,6 +276,7 @@ def build_report(args):
     created = bootstrap_runtime(paths) if args.bootstrap else []
     checks = {
         "skill_package": check_skill_package(errors),
+        "role_discipline": check_role_discipline(errors),
         "runtime_artifacts": check_runtime_artifacts(paths, errors),
     }
     capabilities = inspect_capabilities(args, warnings)
