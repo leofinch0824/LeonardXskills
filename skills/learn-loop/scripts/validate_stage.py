@@ -645,6 +645,7 @@ def _validate_stage_0(
             "角色 / 使用场景",
             "画像句",
             "默认处理",
+            "诊断探针",
         ),
         "能力与降级": (
             "独立性档位",
@@ -756,10 +757,13 @@ def _validate_stage_0(
     profile = sections["学习画像"]
     if profile is not None:
         source_fields = ("当前水平", "目标深度", "角色 / 使用场景")
+        lock_owner_fields = ("当前水平", "角色 / 使用场景")
         missing = False
         for label in source_fields:
             value = normalize_value(profile.fields.get(label, ""))
-            if not value.startswith(("用户回答：", "用户开场已提供：", "未提供")):
+            if not value.startswith(
+                ("用户回答：", "用户开场已提供：", "推断待确认：", "未提供")
+            ):
                 _add(
                     violations,
                     file,
@@ -767,10 +771,45 @@ def _validate_stage_0(
                     f"学习画像字段缺少来源标记：{label}",
                     record="学习画像",
                     field=label,
-                    expected="用户回答： / 用户开场已提供： / 未提供",
+                    expected="用户回答： / 用户开场已提供： / 推断待确认： / 未提供",
+                    actual=value,
+                )
+            if value.startswith("推断待确认："):
+                _add(
+                    violations,
+                    file,
+                    "PROFILE_INFERRED_UNCONFIRMED",
+                    f"画像存在未确认推断：{label}——先按诊断探针产出一次性批量确认，"
+                    "改记 用户回答： 后重跑",
+                    record="学习画像",
+                    field=label,
+                    expected="用户回答：",
+                    actual=value,
+                )
+            if label in lock_owner_fields and not value.startswith("用户回答："):
+                _add(
+                    violations,
+                    file,
+                    "PROFILE_LOCK_OWNER",
+                    f"锁定权规则：{label}的终态前缀必须为 用户回答：",
+                    record="学习画像",
+                    field=label,
+                    expected="用户回答：",
                     actual=value,
                 )
             missing = missing or value.startswith("未提供")
+        probe2 = normalize_value(profile.fields.get("诊断探针", "")).strip("。")
+        if not (probe2.startswith("未执行：") or probe2.startswith("已执行：")):
+            _add(
+                violations,
+                file,
+                "PROBE2_VALUE",
+                "诊断探针只能写“未执行：<理由>”或“已执行：<两方向要点> → 确认问题（逐条一行）”",
+                record="学习画像",
+                field="诊断探针",
+                expected="未执行：<理由> / 已执行：<两方向要点> → 确认问题（逐条一行）",
+                actual=probe2,
+            )
         default = normalize_value(profile.fields.get("默认处理", "")).strip("。")
         if missing and not default.startswith("已按默认值执行："):
             _add(
