@@ -12,6 +12,8 @@ learning
 tests
 .agents
 .claude
+.zcode
 .paper-reading
 pyproject.toml
 poetry.lock
+skills-lock.json
